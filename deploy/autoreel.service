@@ -9,6 +9,8 @@ ExecStart=/usr/bin/python3 /opt/autoreel/run.py daemon --every 60
 Restart=on-failure
 RestartSec=300
 User=autoreel
+# Put ANTHROPIC_API_KEY=sk-ant-... in this file (chmod 600) so the daemon can reach Claude
+EnvironmentFile=/opt/autoreel/secrets/env
 
 [Install]
 WantedBy=multi-user.target

@@ -4,6 +4,6 @@ google-api-python-client>=2.100
 google-auth-oauthlib>=1.2
 google-auth>=2.23
 tzdata>=2024.1
+anthropic>=0.40     # Claude API (llm.provider: anthropic)
 # optional
-anthropic>=0.40     # only if llm.provider: anthropic
 pytest>=8           # tests

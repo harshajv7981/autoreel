@@ -7,12 +7,16 @@ paths:
   state_db: ./data/autoreel.db
 
 llm:
-  provider: ollama             # ollama (local, free, no sign-up) | anthropic | none
+  provider: anthropic          # anthropic (Claude API) | ollama (local, free) | none (templates only)
+  # Claude: set the key as an environment variable, never in this file:  export ANTHROPIC_API_KEY=...
+  anthropic_text_model: claude-sonnet-5-5    # captions, hooks, trend planning
+  anthropic_vision_model: claude-haiku-5-5   # rates frames of candidate moments (runs most often)
+  max_tokens: 1500
+  temperature: 0.8
+  # Ollama alternative (local, no key)
   ollama_url: http://localhost:11434
   text_model: qwen2.5:7b
-  vision_model: qwen2.5vl:7b   # rates candidate moments from sampled frames; none = motion score only
-  anthropic_model: claude-sonnet-5-5
-  temperature: 0.8
+  vision_model: qwen2.5vl:7b
 
 policy:
   # US public domain: works published in year Y are public domain from Jan 1 of Y+96.

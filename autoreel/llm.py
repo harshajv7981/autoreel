@@ -82,33 +82,64 @@ class OllamaLLM(NullLLM):
 
 
 class AnthropicLLM(NullLLM):
+    """Claude API. Key comes from the ANTHROPIC_API_KEY environment variable (never from config files).
+
+    Two models: a stronger one writes captions and plans trends (text), a fast one rates frames
+    (vision) - frame judging runs many more times per day than copywriting.
+    """
     name = "anthropic"
+    JSON_SYSTEM = "Reply with a single JSON object only. No prose before or after it, no code fences."
 
     def __init__(self, cfg):
-        import anthropic
-        self.client = anthropic.Anthropic()
-        self.model = cfg.anthropic_model
+        import os
+        self.text_model = cfg.get("anthropic_text_model") or cfg.get("anthropic_model") or "claude-sonnet-5-5"
+        self.vision_model = cfg.get("anthropic_vision_model") or self.text_model
+        self.temperature = cfg.get("temperature", 0.8)
+        self.max_tokens = cfg.get("max_tokens", 1500)
+        self.usage = {"calls": 0, "input_tokens": 0, "output_tokens": 0}
+        self._ok = bool(os.getenv("ANTHROPIC_API_KEY"))
+        self.client = None
+        if not self._ok:
+            log.warning("ANTHROPIC_API_KEY is not set - falling back to motion scores and caption templates")
+            return
+        try:
+            import anthropic
+        except ImportError:
+            log.warning("anthropic package missing - run: pip install anthropic")
+            self._ok = False
+            return
+        self.client = anthropic.Anthropic(max_retries=3, timeout=120)
 
     def available(self) -> bool:
-        return True
+        return self._ok
 
-    def _call(self, content) -> str | None:
-        try:
-            msg = self.client.messages.create(model=self.model, max_tokens=1200,
-                                              messages=[{"role": "user", "content": content}])
-            return "".join(b.text for b in msg.content if getattr(b, "type", "") == "text")
-        except Exception as e:  # noqa: BLE001
-            log.warning("anthropic call failed: %s", e)
+    def _call(self, model: str, content, as_json: bool) -> str | None:
+        if not self._ok:
             return None
+        kwargs = {"model": model, "max_tokens": self.max_tokens, "temperature": self.temperature,
+                  "messages": [{"role": "user", "content": content}]}
+        if as_json:
+            kwargs["system"] = self.JSON_SYSTEM
+        try:
+            msg = self.client.messages.create(**kwargs)
+        except Exception as e:  # noqa: BLE001
+            log.warning("Claude call failed (%s): %s", model, e)
+            return None
+        u = getattr(msg, "usage", None)
+        self.usage["calls"] += 1
+        if u is not None:
+            self.usage["input_tokens"] += getattr(u, "input_tokens", 0) or 0
+            self.usage["output_tokens"] += getattr(u, "output_tokens", 0) or 0
+        return "".join(b.text for b in msg.content if getattr(b, "type", "") == "text")
 
     def text(self, prompt, as_json=False):
-        return self._call(prompt)
+        return self._call(self.text_model, prompt, as_json)
 
     def vision(self, prompt, images, as_json=False):
         blocks = [{"type": "image", "source": {"type": "base64", "media_type": "image/jpeg",
                                                "data": base64.b64encode(Path(p).read_bytes()).decode()}}
                   for p in images]
-        return self._call(blocks + [{"type": "text", "text": prompt}])
+        return self._call(self.vision_model, blocks + [{"type": "text", "text": prompt}], as_json)
 
 
 def make_llm(cfg):

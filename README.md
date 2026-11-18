@@ -27,8 +27,8 @@ tells it with on-screen text (no voice-over), and every week stitches the best m
  Weekly long-form  ── best Shorts re-cut from the originals with context, 16:9, chapters, sources
 ```
 
-Everything except the final upload runs on your machine with free, open-source tools.
-No account is needed for footage, AI models or editing.
+Footage and editing use free, open-source tools with no accounts. The AI steps use the Claude API
+(or a free local model via Ollama), and the final upload uses your YouTube account.
 
 ## What the channel audit changed (v3)
 
@@ -77,9 +77,13 @@ the label itself when it detects undisclosed synthetic media.
 ## Setup (one time, ~30 minutes)
 
 1. **Install tools**: Python 3.10+, `ffmpeg`, then `pip install -r requirements.txt`.
-2. **Local AI (free, no sign-up)**: install [Ollama](https://ollama.com), then
-   `ollama pull qwen2.5:7b` and `ollama pull qwen2.5vl:7b`.
-   No GPU? It still works, just slower. Or set `llm.provider: none` to use motion scores and caption templates.
+2. **Claude API (default)**: create a key at console.anthropic.com, then set it as an environment variable
+   (never put it in config.yaml or commit it):
+   * macOS/Linux: `export ANTHROPIC_API_KEY="sk-ant-..."` (add to `~/.bashrc` or the systemd unit)
+   * Windows PowerShell: `setx ANTHROPIC_API_KEY "sk-ant-..."` then open a new terminal
+   Models: `claude-sonnet-5-5` writes captions and plans trends; `claude-haiku-5-5` rates frames
+   (it runs most often, so the faster, cheaper model). Each cycle logs how many tokens it used.
+   Prefer free and local? Set `llm.provider: ollama` and run `ollama pull qwen2.5:7b qwen2.5vl:7b`.
 3. **YouTube access** (the only account step; uses your existing Google account):
    1. Google Cloud Console → new project → enable **YouTube Data API v3**.
    2. OAuth consent screen → External → add yourself as a test user, then **Audience → Publish app**.
@@ -173,5 +177,5 @@ autoreel/compose/          ffmpeg composer, 6 ASS layouts, HyperFrames overlay
 autoreel/review.py         review page + Telegram approvals
 autoreel/publisher.py      scheduling + YouTube upload
 templates/hyperframes/     HTML overlay template (+ vendored GSAP)
-tests/                     33 tests, including full agent cycles and long-form builds
+tests/                     35 tests, including full agent cycles and long-form builds
 ```

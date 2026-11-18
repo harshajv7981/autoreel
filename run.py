@@ -47,6 +47,10 @@ def cycle(cfg, db, args):
         log.info("%d Short(s) waiting for review: %s", waiting, page)
     n = publish_approved(cfg, db, dry_run=args.dry_run, headless=args.headless)
     log.info("uploaded %d", n)
+    usage = getattr(agent.llm, "usage", None)
+    if usage and usage["calls"]:
+        log.info("Claude usage this cycle: %d calls, %d input / %d output tokens",
+                 usage["calls"], usage["input_tokens"], usage["output_tokens"])
 
 
 def main():

@@ -103,3 +103,38 @@ def test_longform_has_thumbnail(project):
     meta = json.loads(db.clip(cid)["meta"])
     v = probe(meta["thumbnail"])["streams"][0]
     assert (int(v["width"]), int(v["height"])) == (1280, 720)
+
+
+def test_claude_provider_split_models_and_json(monkeypatch, tmp_path):
+    """Claude: text and vision use their own models, JSON mode adds a system prompt, usage is counted."""
+    from types import SimpleNamespace
+
+    from autoreel.llm import AnthropicLLM, make_llm
+    calls = []
+
+    class FakeMessages:
+        def create(self, **kw):
+            calls.append(kw)
+            return SimpleNamespace(content=[SimpleNamespace(type="text", text='{"ok": true}')],
+                                   usage=SimpleNamespace(input_tokens=100, output_tokens=20))
+
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
+    llm = make_llm(Cfg({"provider": "anthropic", "anthropic_text_model": "claude-sonnet-5-5",
+                        "anthropic_vision_model": "claude-haiku-5-5", "temperature": 0.7}))
+    assert isinstance(llm, AnthropicLLM) and llm.available()
+    llm.client = SimpleNamespace(messages=FakeMessages())
+    img = tmp_path / "f.jpg"
+    img.write_bytes(b"\xff\xd8\xff\xd9")
+    assert llm.text("hi", as_json=True) == '{"ok": true}'
+    llm.vision("rate", [img], as_json=True)
+    assert calls[0]["model"] == "claude-sonnet-5-5" and "system" in calls[0]
+    assert calls[1]["model"] == "claude-haiku-5-5"
+    assert calls[1]["messages"][0]["content"][0]["type"] == "image"
+    assert llm.usage == {"calls": 2, "input_tokens": 200, "output_tokens": 40}
+
+
+def test_claude_without_key_falls_back(monkeypatch):
+    from autoreel.llm import make_llm
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    llm = make_llm(Cfg({"provider": "anthropic"}))
+    assert not llm.available() and llm.text("x") is None
