@@ -49,7 +49,7 @@ def test_trend_candidates_filter_and_rank(project, fake_wiki):
     cfg = load_config(project / "config.yaml")
     titles = [t.title for t in trends.candidates(cfg)]
     assert "Artemis II" in titles and "Holland Tunnel" in titles and "Zeppelin" in titles
-    for bad in ("Main Page", "Deaths in 2026", "Wicked: For Good (film)"):
+    for bad in ("Main Page", "Deaths in 2026", "Wicked: For Good (film)", "Manchester United F.C."):
         assert bad not in titles
     assert titles.index("Artemis II") < titles.index("Zeppelin")
 

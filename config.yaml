@@ -18,13 +18,28 @@ policy:
   # US public domain: works published in year Y are public domain from Jan 1 of Y+96.
   # The cutoff year is computed automatically from today's date.
   trusted_pd_collections: [prelinger, prelinger_library, ephemera]  # vetted by the archive itself
+  # US federal government works are public domain whatever their year (17 U.S.C. 105)
+  gov_collections: [fedflix, nasa, usnationalarchives, nationalarchives]
   blocked_terms: [ai generated, ai-generated, generated with, midjourney, sora, runway gen,
                   stable diffusion, synthetic, deepfake, "made with ai", colorized, colourized,
                   upscaled, "ai restored", "ai enhanced"]
+  # Versions that third parties fingerprint in Content ID: new scans, restorations, added scores,
+  # and re-uploads from archives that file claims on their own copies of public-domain film.
+  content_id_risk_terms: [restored, restoration, remaster, remastered, " 4k", "4k ", " hd ", "hd version",
+                          "1080p", "60fps", "new score", "new music", "musical score by", "soundtrack by",
+                          "british pathe", "british pathé", "pathe news", "reuters", "ap archive",
+                          "periscope film", "periscopefilm", "criticalpast", "critical past",
+                          "huntley film", "kinolibrary", "pond5", "getty images", "shutterstock",
+                          "film archives inc", "watermark"]
   max_clips_per_source: 6      # don't milk a single film forever
 
 trends:
   feeds: [wikipedia_top, on_this_day]   # keyless Wikipedia feeds
+  # Topics that pay best for an India-based channel aimed at US/UK viewers get a ranking boost
+  boost_terms: [nasa, apollo, artemis, moon, lunar, mars, orbit, astronaut, launch, space, rocket, aviation, aircraft, airship, zeppelin, railroad, railway,
+                locomotive, ship, submarine, navy, cold war, nuclear, atomic, bomb test, engineering,
+                bridge, dam, tunnel, invention, inventor, computer, radio, television, automobile,
+                world war, wwii, d-day, depression, prohibition, hollywood, silent film, newsreel]
   top_n: 60                    # how many of yesterday's most-read articles to consider
   max_topics: 8                # topics planned per day (cached in data/trends_<date>.json)
 
@@ -42,6 +57,9 @@ compose:
   music_volume: 0.85
   grain: true                  # subtle film grain + slight colour variance so renders don't look templated
   hyperframes_version: 0.9.65
+
+shorts:
+  max_seconds: 58              # Shorts over 1 minute are BLOCKED if they get any Content ID claim
 
 finder:
   analysis_fps: 4
@@ -69,7 +87,7 @@ youtube:
   made_for_kids: false
   default_language: en
   max_uploads_per_day: 6       # across all channels; API default bucket is 100/day
-  set_thumbnail: false         # Shorts ignore custom thumbnails
+  set_thumbnail: true          # long-form thumbnails (needs a phone-verified channel: youtube.com/verify)
   schedule:
     timezone: Asia/Kolkata
     slots: ["12:40", "19:10"]  # local times; each slot gets one Short per channel
@@ -93,6 +111,8 @@ channels:
       # evergreen fallback when no trend has footage today
       - type: internet_archive
         query: 'collection:(Prelinger_Library OR prelinger) AND subject:(technology OR invention OR transportation)'
+      - type: internet_archive   # US government films: Cold War, aviation, engineering
+        query: 'collection:(FedFlix) AND subject:(aviation OR nuclear OR space OR engineering OR navy)'
     tags: [history, archive footage, on this day, vintage, documentary]
 
   - name: classic-comedy

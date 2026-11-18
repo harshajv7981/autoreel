@@ -26,6 +26,8 @@ def write_review_page(cfg, db) -> Path:
     <div class="id">#{row['id']} · {html.escape(row['channel'])}</div>
     <h3>{html.escape(meta['title'])}</h3>
     <p class="hook">{html.escape(' / '.join(meta['hook']))}</p>
+    <p class="muted">Packaging score {meta.get('packaging_score')}{''.join(
+        f"<br>alt ({a['score']}): {html.escape(a['title'])} | {html.escape(a['hook'])}" for a in meta.get('alternates', []))}</p>
     <pre>{html.escape(meta['description'])}</pre>
     <p class="muted">Moment {row['start']:.0f}-{row['end']:.0f}s · score {row['score']:.2f}
       · judge: {html.escape(str(judged.get('reason', '')))} · copy: {html.escape(str(meta.get('copy_source')))}</p>

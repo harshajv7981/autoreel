@@ -49,7 +49,7 @@ def test_retry_with_feedback():
     llm = FakeLLM()
     item = SourceItem(**{**ITEM.__dict__, "year": 1916})
     copy = copywriter.write(llm, item, {"what_happens": "a man plays violin"}, "dry", seed=1)
-    assert copy["source"] == "llm (attempt 2)"
+    assert copy["source"].startswith("llm (attempt 2")
     assert "rejected" in llm.calls[1] and "ultimate" in llm.calls[1]
 
 

@@ -30,10 +30,11 @@ def style_for(seed: int, layouts=None, frames=None) -> dict:
             "grain": rng.randint(4, 9), "title_y": rng.choice([190, 220, 250]),
             "pop": rng.choice([True, False]),
             "layout": rng.choice(list(layouts or LAYOUTS)), "frame": rng.choice(list(frames or FRAMES)),
-            "card_bg": rng.choice(["#111111", "#14161c", "#1b1712", "#101a17"])}
+            "card_bg": rng.choice(["#111111", "#14161c", "#1b1712", "#101a17"]),
+            "push_in": rng.random() < 0.7, "timeline": rng.random() < 0.75, "progress": True}
 
 
-def base_filter(src: Path, cfg, style: dict, ass: Path | None) -> str:
+def base_filter(src: Path, cfg, style: dict, ass: Path | None, length: float = 0.0) -> str:
     W, H = cfg.compose.width, cfg.compose.height
     w, h = video_size(src)
     vertical = h > w
@@ -48,6 +49,11 @@ def base_filter(src: Path, cfg, style: dict, ass: Path | None) -> str:
     else:
         fg = (f"scale=-2:{H}" if vertical else
               f"crop='min(iw,ih)':'min(iw,ih)',scale={W}:{W}" if frame == "square" else f"scale={W}:-2")
+        if style.get("push_in") and length:
+            fw, fh = (round(w * H / h / 2) * 2, H) if vertical else (W, W) if frame == "square" else \
+                (W, round(h * W / w / 2) * 2)
+            fg += (f",scale=w='trunc({fw}*(1+0.07*t/{length:.2f})/2)*2':h=-2:eval=frame,"
+                   f"crop={fw}:{fh},setsar=1")
         g = (f"[0:v]setsar=1,split[a][b];"
              f"[a]scale={W}:{H}:force_original_aspect_ratio=increase,crop={W}:{H},"
              f"boxblur=26:2,eq=brightness=-0.13:saturation=0.75[bg];"
@@ -82,7 +88,7 @@ def render_base(src: Path, start: float, end: float, out: Path, cfg, seed: int,
     else:
         cmd += ["-f", "lavfi", "-t", f"{length:.3f}", "-i", "anullsrc=r=48000:cl=stereo"]
     amap = "1:a"
-    graph = base_filter(src, cfg, style, ass)
+    graph = base_filter(src, cfg, style, ass, length)
     fade_out = max(0.0, length - 0.8)
     if original_audio:
         graph += (f";[0:a]asetpts=PTS-STARTPTS,afade=t=in:d=0.25,afade=t=out:st={fade_out:.2f}:d=0.8,"
@@ -107,9 +113,12 @@ def render_base(src: Path, start: float, end: float, out: Path, cfg, seed: int,
 
 
 def compose(src: Path, start: float, end: float, copy: dict, credit_line: str, out: Path,
-            cfg, seed: int, music: Path | None, original_audio: bool = False, label: str = "") -> Path:
+            cfg, seed: int, music: Path | None, original_audio: bool = False, label: str = "",
+            year: int | None = None) -> Path:
+    import datetime
     text = {"line1": copy["hook_line1"], "line2": copy["hook_line2"], "keyword": copy.get("keyword", ""),
-            "beats": copy.get("beats") or [], "credit": credit_line, "label": label}
+            "beats": copy.get("beats") or [], "credit": credit_line, "label": label,
+            "year": year, "now_year": datetime.date.today().year}
     renderer = cfg.compose.renderer
     if renderer == "hyperframes":
         from .hyperframes import render_overlay

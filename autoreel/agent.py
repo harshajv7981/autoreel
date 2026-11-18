@@ -106,10 +106,11 @@ class Agent:
             out_dir.mkdir(parents=True, exist_ok=True)
             out = out_dir / f"{seed:08x}.mp4"
             compose(video, m.start, m.end, copy, credit, out, self.cfg, seed, music,
-                    original_audio=original, label=label)
+                    original_audio=original, label=label, year=item.year)
             meta = {
                 "title": copy["title"], "hook": [copy["hook_line1"], copy["hook_line2"]],
                 "keyword": copy.get("keyword"), "beats": copy.get("beats", []), "copy_source": copy.get("source"),
+                "packaging_score": copy.get("score"), "alternates": copy.get("alternates", []),
                 "description": copywriter.description(copy, item, music_credit, list(ch.tags),
                                                       topic.url if topic else None),
                 "tags": list(ch.tags) + ([topic.title] if topic else []), "music": str(music) if music else None,

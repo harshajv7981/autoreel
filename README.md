@@ -30,6 +30,26 @@ tells it with on-screen text (no voice-over), and every week stitches the best m
 Everything except the final upload runs on your machine with free, open-source tools.
 No account is needed for footage, AI models or editing.
 
+## What the channel audit changed (v3)
+
+An audit of 18+ archival channels found no verified creator earning passive AdSense from unattended
+clip-and-caption channels. The ones that grow (e.g. "Then & Now" history channels) win on **packaging**
+and **motion**; the ones that stall post raw archive reels; the ones that get demonetized look like
+slideshows or templates. So AutoReel now:
+
+| Lesson | What the code does |
+|---|---|
+| Hooks decide everything | The copywriter drafts 4 title/hook options, rejects any with facts not in the sources, scores the rest (specific subject, real number, curiosity gap, no generic words) and keeps the best. Alternates appear on the review page. |
+| Static visuals get flagged as reused content | Slow push-in on the footage, a then-to-now timeline with a moving marker, fact callouts that slide in with numbers highlighted, and a progress bar. Long-form parts get year stamps and chapter progress. |
+| Restored/rescored copies get Content ID claims | `policy.content_id_risk_terms` skips restored, remastered, 4K/HD, rescored versions and re-uploads from archives that file claims (British Pathé, Periscope Film, CriticalPast and others). |
+| Claimed Shorts over 1 minute are blocked | Shorts are capped at 58 seconds whatever the config says. |
+| US/UK history, aerospace and tech pay best | Trend topics matching `trends.boost_terms` rank higher; US government films (FedFlix, NASA) are accepted at any year because federal works are public domain. |
+| Long-form needs a thumbnail | Each weekly video gets a 1280x720 thumbnail from its sharpest frame with a two-line hook and year badge, uploaded automatically once your channel is phone-verified. |
+
+Reality check from the same audit: archive long-form earns roughly $2-3 per 1,000 views and Shorts
+about $0.17-0.33 even in the US/UK, and a solo archival channel can sit near zero for months. One video
+making nearly all of a channel's views has also triggered YPP reviews. Plan for slow growth and steady variety.
+
 ## Why there's no AI label
 
 YouTube labels **realistic altered or synthetic** content: AI-generated people, voices, places or events.
@@ -153,5 +173,5 @@ autoreel/compose/          ffmpeg composer, 6 ASS layouts, HyperFrames overlay
 autoreel/review.py         review page + Telegram approvals
 autoreel/publisher.py      scheduling + YouTube upload
 templates/hyperframes/     HTML overlay template (+ vendored GSAP)
-tests/                     27 tests, including full agent cycles and long-form builds
+tests/                     33 tests, including full agent cycles and long-form builds
 ```

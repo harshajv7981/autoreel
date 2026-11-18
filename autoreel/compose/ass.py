@@ -26,6 +26,25 @@ def highlight(line: str, keyword: str, accent: str, base: str = "&H00FFFFFF&") -
     return esc(line[:i]) + "{\\c" + ass_color(accent) + "&}" + esc(line[i:j]) + "{\\c" + base + "}" + esc(line[j:])
 
 
+def numbers_accent(text: str, accent: str) -> str:
+    """Escape, then colour every number/year so facts read like data callouts."""
+    import re
+    out, last = [], 0
+    for m in re.finditer(r"\d[\d,.]*\d|\d", text):
+        out.append(esc(text[last:m.start()]))
+        out.append("{\\c" + ass_color(accent) + "&\\b1}" + esc(m.group(0)) + "{\\c&H00FFFFFF&}")
+        last = m.end()
+    out.append(esc(text[last:]))
+    return "".join(out)
+
+
+def rect(w: int, h: int) -> str:
+    return f"m 0 0 l {w} 0 {w} {h} 0 {h}"
+
+
+DOT = "m 0 -12 b 7 -12 12 -7 12 0 b 12 7 7 12 0 12 b -7 12 -12 7 -12 0 b -12 -7 -7 -12 0 -12"
+
+
 def ts(t: float) -> str:
     cs = int(round(max(0.0, t) * 100))
     h, cs = divmod(cs, 360000)
@@ -91,9 +110,37 @@ def build_ass(text: dict, style: dict, W: int, H: int, length: float) -> str:
     if beats:
         start = max(1.2, hook_end if layout == "minimal" else 1.2)
         span = max(1.0, (length - 0.3 - start) / len(beats))
+        an, bx = (1, 70) if layout == "lower_third" else (2, W // 2)
+        by = H - 330
         for i, b in enumerate(beats):
             a, z = start + i * span, start + (i + 1) * span - 0.1
-            events.append(f"Dialogue: 1,{ts(a)},{ts(z)},Beat,,0,0,0,,{{\\fad(160,140)}}{prefix}{esc(b)}")
+            slide = f"\\an{an}\\move({bx - 70},{by},{bx},{by},0,240)"
+            events.append(f"Dialogue: 1,{ts(a)},{ts(z)},Beat,,0,0,0,,{{{slide}\\fad(160,140)}}{prefix}"
+                          f"{numbers_accent(b, accent)}")
+
+    # then -> now timeline: makes the age of the footage visible and moving
+    year, now = text.get("year"), text.get("now_year")
+    if style.get("timeline", True) and year and now and now - year >= 5:
+        x0, x1, ty = 210, W - 210, H - 205
+        t_in, t_out = 0.4, min(length, 5.5)
+        events += [
+            f"Dialogue: 0,{ts(t_in)},{ts(t_out)},Credit,,0,0,0,,{{\\an7\\pos({x0},{ty - 2})\\p1\\c&H00FFFFFF&"
+            f"\\alpha&H70&\\fad(200,300)}}{rect(x1 - x0, 4)}{{\\p0}}",
+            f"Dialogue: 1,{ts(t_in)},{ts(t_out)},Credit,,0,0,0,,{{\\an5\\move({x0},{ty},{x1},{ty},150,1350)"
+            f"\\p1\\c{acc}&\\fad(200,300)}}{DOT}{{\\p0}}",
+            f"Dialogue: 1,{ts(t_in)},{ts(t_out)},Credit,,0,0,0,,{{\\an6\\pos({x0 - 18},{ty})\\fs34\\b1"
+            f"\\c&H00FFFFFF&\\fad(200,300)}}{year}",
+            f"Dialogue: 1,{ts(t_in)},{ts(t_out)},Credit,,0,0,0,,{{\\an4\\pos({x1 + 18},{ty})\\fs34\\b1"
+            f"\\c&H00FFFFFF&\\fad(200,300)}}{now}",
+            f"Dialogue: 1,{ts(t_in + 1.3)},{ts(t_out)},Credit,,0,0,0,,{{\\an2\\pos({W // 2},{ty - 22})\\fs36"
+            f"\\b1\\c{acc}&\\fad(250,300)}}{now - year} YEARS AGO",
+        ]
+
+    # progress bar along the top edge: a small, constant motion cue
+    if style.get("progress", True):
+        ms = int(length * 1000)
+        events.append(f"Dialogue: 3,{ts(0)},{ts(length)},Credit,,0,0,0,,{{\\an7\\pos(0,0)\\p1\\c{acc}&"
+                      f"\\alpha&H20&\\fscx0\\t(0,{ms},\\fscx100)}}{rect(W, 8)}{{\\p0}}")
     events.append(f"Dialogue: 0,{ts(0)},{ts(length)},Credit,,0,0,0,,{esc(text.get('credit', ''))}")
 
     return "\n".join([

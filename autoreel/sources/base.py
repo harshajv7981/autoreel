@@ -83,19 +83,27 @@ class Policy:
     def __init__(self, cfg):
         self.blocked = [t.lower() for t in cfg.policy.blocked_terms]
         self.trusted = {c.lower() for c in cfg.policy.trusted_pd_collections}
+        self.gov = {c.lower() for c in cfg.policy.get("gov_collections", [])}
+        self.cid_risk = [t.lower() for t in cfg.policy.get("content_id_risk_terms", [])]
         self.cutoff = us_pd_cutoff()
 
     def check(self, item: SourceItem) -> tuple[bool, str]:
-        text = f"{item.title} {item.text}".lower()
+        text = f"{item.title} {item.text} {item.meta.get('file') or ''}".lower()
         for term in self.blocked:
             if term in text:
                 return False, f"blocked term: {term!r} (possible AI/altered media)"
+        padded = f" {text} "
+        for term in self.cid_risk:
+            if term in padded:
+                return False, f"Content ID risk: {term.strip()!r} (restored/rescored copy or a claim-filing archive)"
 
         if item.source == "internet_archive":
             collections = {c.lower() for c in as_list(item.meta.get("collection"))}
             lic = (item.meta.get("licenseurl") or "").lower()
             if item.year and item.year <= self.cutoff:
                 return True, f"published {item.year} (US public domain, cutoff {self.cutoff})"
+            if collections & self.gov:
+                return True, "US federal government work (public domain, 17 U.S.C. 105)"
             if collections & self.trusted and ("publicdomain" in lic or "/zero/" in lic or "mark" in lic):
                 return True, "archive-vetted public-domain collection"
             return False, f"year {item.year} after cutoff {self.cutoff} and not in a vetted PD collection"

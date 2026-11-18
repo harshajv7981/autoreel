@@ -41,7 +41,11 @@ def load_config(path: str | Path) -> Cfg:
         (cfg.paths.data / sub).mkdir(parents=True, exist_ok=True)
 
     cfg.youtube.client_secret = res(cfg.youtube.client_secret)
+    cap = (cfg.get("shorts") or {}).get("max_seconds", 58)
     for ch in cfg.channels:
+        lo, hi = ch.clip_seconds
+        if hi > cap:                 # claimed Shorts over 60s are blocked outright
+            ch.clip_seconds = [min(lo, cap - 5), cap]
         ch.token = res(ch.token)
         for src in ch.sources:
             if src.get("folder"):

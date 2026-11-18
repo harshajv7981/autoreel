@@ -90,7 +90,8 @@ def lint(copy: dict, facts: str) -> list[str]:
     return sorted(set(problems))
 
 
-PROMPT = """You write captions for a YouTube Shorts channel that posts clips from public-domain films.
+PROMPT = """You write the packaging and captions for a YouTube Shorts channel that posts REAL archival
+public-domain footage for viewers in the US and UK. There is no voice-over: on-screen text tells the story.
 Channel voice: {voice}
 
 SOURCE FACTS (the only facts you may use; never invent names, dates, numbers or claims):
@@ -98,20 +99,50 @@ SOURCE FACTS (the only facts you may use; never invent names, dates, numbers or 
 - Archive notes: {notes}
 - What happens in this clip (from frame analysis): {what}
 {topic}
-Write JSON with exactly these keys:
-"hook_line1": first line of on-screen text, 2-5 words, sets up the moment
-"hook_line2": second line, 2-5 words, the payoff or tension
-"keyword": one or two words from the hook lines to highlight in colour
-"title": YouTube title, 25-60 characters, sentence case, specific to this clip
+Packaging that works: a specific subject + a surprising true detail, so the viewer needs to see what happens.
+Pattern examples (style only, not facts): "The nuclear test that accidentally vaporized an island",
+"Why this bridge was built to sway", "The airship that crossed the Atlantic before planes could".
+
+Return JSON with:
+"options": 4 different packaging options, each {{"hook_line1": 2-5 words, "hook_line2": 2-5 words,
+           "keyword": 1-2 words from the hook to colour, "title": 30-60 characters, sentence case}}
 "description": 1-3 short sentences in the channel voice, with one real detail from the facts
-"beats": list of 2-3 on-screen captions shown one after another while the clip plays (each 4-12 words),
-         telling a tiny story with real facts: context, then the surprising detail. There is no voice-over,
-         so the beats carry the story.
+"beats": 2-3 on-screen captions shown one after another (each 4-12 words): context first, then the
+         surprising detail. Put any real number or year from the facts in them.
 
 Style rules: sound like a person, not an ad. Plain words. No hype words (epic, insane, ultimate,
 legendary, iconic, jaw-dropping), no "you won't believe", no em dashes, no hashtags, at most one
-emoji in total, at most one exclamation mark. Don't mention AI.
+emoji in total, at most one exclamation mark. Don't mention AI. Never claim something the facts don't say.
 {feedback}"""
+
+CURIOSITY = ["accidentally", "almost", "nearly", "never", "first", "last", "only", "why", "how", "before",
+             "after", "forgot", "wrong", "nobody", "still", "until", "lost", "the day", "what happened",
+             "built to", "tried to", "nearly", "instead"]
+GENERIC = ["moment", "moments", "video", "clip", "footage", "amazing", "interesting", "cool", "old film",
+           "classic", "vintage", "watch this", "check out"]
+
+
+def score(copy: dict, facts: str) -> float:
+    """Packaging quality: specific, concrete, curious, not generic. Grounding is lint's job."""
+    title = copy.get("title", "")
+    hook = f"{copy.get('hook_line1', '')} {copy.get('hook_line2', '')}".lower()
+    t = title.lower()
+    s = 2.0 if 35 <= len(title) <= 60 else 1.0 if 25 <= len(title) <= 70 else 0.0
+    if re.search(r"\d", title):
+        s += 1.5                                                    # concrete number or year
+    names = re.findall(r"\b[A-Z][a-z]{2,}(?:\s[A-Z][a-z]{2,})*", title[1:])
+    if any(n.lower() in facts.lower() for n in names):
+        s += 1.5                                                    # a specific, real subject
+    s += min(2, sum(1 for w in CURIOSITY if w in t or w in hook))
+    s -= 1.5 * sum(1 for w in GENERIC if re.search(rf"\b{re.escape(w)}\b", t))
+    if "?" in title:
+        s -= 0.5
+    if len(copy.get("hook_line1", "")) <= 18 and len(copy.get("hook_line2", "")) <= 18:
+        s += 0.5
+    shared = set(re.findall(r"[a-z]{4,}", t)) & set(re.findall(r"[a-z]{4,}", hook))
+    if len(shared) >= 3:
+        s -= 0.5                                                    # hook just repeats the title
+    return round(s, 2)
 
 
 def template_copy(item, rng: random.Random) -> dict:
@@ -133,6 +164,7 @@ def topic_block(topic) -> str:
 
 
 def write(llm, item, judged: dict, voice: str, seed: int, attempts: int = 3, topic=None) -> dict:
+    """Draft -> expand options -> lint each -> score -> best. Retries with lint feedback."""
     rng = random.Random(seed)
     facts = f"{item.title} {item.year or ''} {item.text} {judged.get('what_happens', '')}"
     if topic:
@@ -143,17 +175,36 @@ def write(llm, item, judged: dict, voice: str, seed: int, attempts: int = 3, top
                                      notes=item.text[:600] or "none",
                                      what=judged.get("what_happens") or "not available",
                                      topic=topic_block(topic), feedback=feedback), as_json=True)
-        copy = parse_json(raw)
-        if not copy:
+        data = parse_json(raw)
+        if not data:
             break
-        problems = lint(copy, facts)
-        if not problems:
-            copy["source"] = f"llm (attempt {i + 1})"
-            return copy
-        feedback = "Your last draft was rejected. Fix these problems:\n- " + "\n- ".join(problems)
-        log.info("copy draft %d rejected: %s", i + 1, "; ".join(problems))
+        shared = {"description": data.get("description", ""), "beats": data.get("beats") or []}
+        options = data.get("options") or [{k: data.get(k, "") for k in ("hook_line1", "hook_line2", "keyword", "title")}]
+        passing, problems_all = [], []
+        for opt in options[:6]:
+            if not isinstance(opt, dict):
+                continue
+            cand = {**shared, **{k: str(opt.get(k, "")) for k in ("hook_line1", "hook_line2", "keyword", "title")}}
+            problems = lint(cand, facts)
+            if problems:
+                problems_all += problems
+            else:
+                passing.append((score(cand, facts), cand))
+        if passing:
+            passing.sort(key=lambda x: x[0], reverse=True)
+            best = dict(passing[0][1])
+            best["score"] = passing[0][0]
+            best["alternates"] = [{"title": c["title"], "hook": f"{c['hook_line1']} / {c['hook_line2']}",
+                                   "score": sc} for sc, c in passing[1:]]
+            best["source"] = f"llm (attempt {i + 1}, {len(passing)}/{len(options)} options passed)"
+            return best
+        feedback = ("Your last draft was rejected. Fix these problems:\n- " +
+                    "\n- ".join(sorted(set(problems_all))[:12]))
+        log.info("copy draft %d rejected: %s", i + 1, "; ".join(sorted(set(problems_all))[:6]))
     copy = template_copy(item, rng)
     copy["source"] = "template"
+    copy["score"] = score(copy, facts)
+    copy["alternates"] = []
     return copy
 
 

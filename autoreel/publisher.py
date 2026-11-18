@@ -88,7 +88,7 @@ def build_body(cfg, meta: dict, publish_at: str | None) -> dict:
     }
 
 
-def upload(service, video: Path, body: dict, playlist_id: str | None) -> str:
+def upload(service, video: Path, body: dict, playlist_id: str | None, thumbnail: Path | None = None) -> str:
     from googleapiclient.errors import HttpError
     from googleapiclient.http import MediaFileUpload
 
@@ -108,6 +108,11 @@ def upload(service, video: Path, body: dict, playlist_id: str | None) -> str:
         except (ConnectionError, TimeoutError, OSError) as e:
             attempt = _backoff(attempt, e)
     vid = response["id"]
+    if thumbnail and Path(thumbnail).exists():
+        try:     # custom thumbnails need a phone-verified channel
+            service.thumbnails().set(videoId=vid, media_body=MediaFileUpload(str(thumbnail))).execute()
+        except HttpError as e:
+            log.warning("thumbnail not set (%s) - verify the channel at youtube.com/verify", _reason(e) or e)
     if playlist_id:
         try:
             service.playlistItems().insert(part="snippet", body={"snippet": {
@@ -154,7 +159,8 @@ def publish_approved(cfg, db, dry_run: bool = False, headless: bool = False) -> 
         try:
             if ch.name not in services:
                 services[ch.name] = get_service(cfg, ch.token, headless)
-            vid = upload(services[ch.name], Path(row["video"]), body, ch.get("playlist_id"))
+            thumb = meta.get("thumbnail") if cfg.youtube.get("set_thumbnail", True) else None
+            vid = upload(services[ch.name], Path(row["video"]), body, ch.get("playlist_id"), thumb)
             db.set_clip(row["id"], status="uploaded", youtube_id=vid, publish_at=publish_at, slot=slot,
                         error=None)
             log.info("uploaded #%d https://youtu.be/%s (goes public %s)", row["id"], vid, publish_at)

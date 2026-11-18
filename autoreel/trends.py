@@ -27,7 +27,7 @@ META = re.compile(r"^(Main_Page|Special:|Wikipedia:|File:|Portal:|Help:|Talk:|Ca
 AVOID = re.compile(r"(\b(19[4-9]\d|20\d\d)_?(film|TV_series|season|video_game|album|song)\b|"
                    r"_\((film|TV_series|album|song|video_game|singer|rapper|actor|actress|footballer|"
                    r"cricketer|politician|YouTuber|influencer|wrestler)\)|"
-                   r"Premier_League|Champions_League|World_Cup_qualif|Indian_Premier_League|NFL|NBA|UFC|"
+                   r"_F\.C\.|_FC\b|football_club|Premier_League|Champions_League|World_Cup_qualif|Indian_Premier_League|NFL|NBA|UFC|"
                    r"Cricket_World_Cup|Grand_Prix|shooting|massacre|murder|killing|attack|death_of|"
                    r"OnlyFans|pornograph|ChatGPT|Squid_Game)", re.I)
 SPACE = re.compile(r"\b(nasa|apollo|artemis|moon|lunar|mars|rover|rocket|launch|space|shuttle|iss|"
@@ -105,6 +105,11 @@ def candidates(cfg, today: date | None = None) -> list[Topic]:
             topics.append(Topic(t, f"On this day in {yr}: {ev.get('text', '')}"[:300], score=0.8 + round_bonus,
                                 facts=p.get("extract", ""), url=(p.get("content_urls") or {}).get("desktop", {})
                                 .get("page", ""), year=yr if isinstance(yr, int) else None))
+    boost = [b.lower() for b in tcfg.get("boost_terms", [])]
+    for t in topics:
+        hay = f" {t.title} {t.why} {t.facts[:300]} ".lower()
+        if any(re.search(rf"\b{re.escape(b)}\b", hay) for b in boost):
+            t.score += 0.5          # US/UK history, aerospace and tech pay best and have the most footage
     seen, uniq = set(), []
     for t in sorted(topics, key=lambda t: t.score, reverse=True):
         if t.title.lower() not in seen:
@@ -114,7 +119,9 @@ def candidates(cfg, today: date | None = None) -> list[Topic]:
 
 
 PLAN_PROMPT = """You plan Shorts for a channel that shows REAL archival public-domain footage
-(films and newsreels from before {cutoff}, NASA footage) connected to what people are reading about today.
+(films and newsreels from before {cutoff}, US government films, NASA footage) connected to what people
+are reading about today. The audience is in the US and UK; favour history, aerospace, engineering,
+transport, the Cold War and old Hollywood, where archives have strong footage.
 
 Trending topic: {title}
 Why it's trending: {why}
