@@ -19,18 +19,19 @@ class QuotaExceeded(RuntimeError):
 
 # ------------------------------------------------------------ scheduling
 
-def next_slot(cfg, taken: set[str], clip_id: int) -> tuple[str, str]:
+def next_slot(cfg, taken: set[str], clip_id: int, slots=None, prefix: str = "") -> tuple[str, str]:
     """Return (slot_key, publishAt UTC). slot_key is the un-jittered local slot."""
     sch = cfg.youtube.schedule
+    slots = slots or sch.slots
     tz = ZoneInfo(sch.timezone)
     earliest = datetime.now(tz) + timedelta(minutes=sch.min_lead_minutes)
     day = earliest.date()
     rng = random.Random(clip_id)
     for _ in range(400):
-        for hhmm in sorted(sch.slots):
+        for hhmm in sorted(slots):
             h, m = map(int, hhmm.split(":"))
             base = datetime(day.year, day.month, day.day, h, m, tzinfo=tz)
-            key = base.strftime("%Y-%m-%dT%H:%M")
+            key = prefix + base.strftime("%Y-%m-%dT%H:%M")
             jit = rng.randint(-sch.jitter_minutes, sch.jitter_minutes) if sch.jitter_minutes else 0
             when = base + timedelta(minutes=jit, seconds=rng.randint(0, 59))
             if when >= earliest and key not in taken:
@@ -141,7 +142,10 @@ def publish_approved(cfg, db, dry_run: bool = False, headless: bool = False) -> 
         meta = json.loads(row["meta"])
         if ch.name not in taken:
             taken[ch.name] = db.taken_slots(ch.name)
-        slot, publish_at = next_slot(cfg, taken[ch.name], row["id"])
+        is_long = row["kind"] == "long"
+        slot, publish_at = next_slot(cfg, taken[ch.name], row["id"],
+                                     slots=cfg.longform.publish_slots if is_long else None,
+                                     prefix="L" if is_long else "")
         taken[ch.name].add(slot)
         body = build_body(cfg, meta, publish_at)
         if dry_run:

@@ -10,11 +10,12 @@ ITEM = SourceItem("internet_archive", "id1", "The Vagabond", 1916, "https://arch
                   text="Charlie Chaplin; Silents; a tramp violinist rescues a girl")
 GOOD = {"hook_line1": "He only wanted", "hook_line2": "a quiet violin solo", "keyword": "violin",
         "title": "Chaplin's violin solo goes wrong",
-        "description": "A tramp tries to play his violin in peace. The street has other plans."}
+        "description": "A tramp tries to play his violin in peace. The street has other plans.",
+        "beats": ["A tramp violinist plays on the street", "Charlie Chaplin made it in 1916"]}
 
 
 def test_good_copy_passes():
-    assert copywriter.lint(GOOD, ITEM.title + " " + ITEM.text) == []
+    assert copywriter.lint(GOOD, ITEM.title + " 1916 " + ITEM.text) == []
 
 
 def test_ai_tells_and_hype_rejected():
@@ -46,7 +47,8 @@ class FakeLLM:
 
 def test_retry_with_feedback():
     llm = FakeLLM()
-    copy = copywriter.write(llm, ITEM, {"what_happens": "a man plays violin"}, "dry", seed=1)
+    item = SourceItem(**{**ITEM.__dict__, "year": 1916})
+    copy = copywriter.write(llm, item, {"what_happens": "a man plays violin"}, "dry", seed=1)
     assert copy["source"] == "llm (attempt 2)"
     assert "rejected" in llm.calls[1] and "ultimate" in llm.calls[1]
 

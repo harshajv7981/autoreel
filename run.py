@@ -9,6 +9,8 @@
   python run.py approve ID [ID..]   approve Shorts for upload
   python run.py reject ID [ID..]    reject Shorts
   python run.py upload              upload approved Shorts into the next free slots
+  python run.py trends              show today's trending topics and their archive searches
+  python run.py longform            build this week's long-form compilation now
   python run.py status              everything the agent has made
 Flags: --dry-run (never upload), --headless (sign in on a server), -v (debug logs)
 """
@@ -22,6 +24,8 @@ from autoreel import log
 from autoreel.agent import Agent, describe_clip
 from autoreel.config import load_config
 from autoreel.db import DB
+from autoreel.longform import build_weekly
+from autoreel.trends import todays_topics
 from autoreel.publisher import get_service, publish_approved
 from autoreel.review import poll_telegram, write_review_page
 
@@ -30,6 +34,10 @@ def cycle(cfg, db, args):
     agent = Agent(cfg, db)
     made = agent.fill_all()
     log.info("made: %s", made)
+    if cfg.longform.enabled:
+        for ch in cfg.channels:
+            if ch.get("enabled", True):
+                build_weekly(cfg, db, agent.llm, ch)
     applied = poll_telegram(cfg, db)
     if applied:
         log.info("applied %d decision(s) from Telegram", applied)
@@ -44,7 +52,7 @@ def cycle(cfg, db, args):
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("command", choices=["auth", "run", "daemon", "make", "review", "approve",
-                                        "reject", "upload", "status"])
+                                        "reject", "upload", "status", "trends", "longform"])
     ap.add_argument("args", nargs="*")
     ap.add_argument("-c", "--config", default=Path(__file__).with_name("config.yaml"))
     ap.add_argument("--dry-run", action="store_true")
@@ -92,6 +100,16 @@ def main():
             print(f"#{a}: {args.command}d")
     elif args.command == "upload":
         log.info("uploaded %d", publish_approved(cfg, db, dry_run=args.dry_run, headless=args.headless))
+    elif args.command == "trends":
+        agent = Agent(cfg, db)
+        for t in todays_topics(cfg, agent.llm, cfg.paths.data, agent.policy.cutoff, cfg.trends.max_topics):
+            print(f"- {t.title}  [{t.why}]\n    angle: {t.angle or '-'}\n    searches: {t.queries}")
+    elif args.command == "longform":
+        agent = Agent(cfg, db)
+        for ch in cfg.channels:
+            if ch.get("enabled", True):
+                cid = build_weekly(cfg, db, agent.llm, ch, force=True)
+                print(f"{ch.name}: {'long-form #' + str(cid) if cid else 'not enough approved Shorts yet'}")
     elif args.command == "status":
         for row in db.clips():
             print(describe_clip(row) + (f"\n   youtube: https://youtu.be/{row['youtube_id']} "

@@ -28,6 +28,10 @@ class DB:
         self.c = sqlite3.connect(path)
         self.c.row_factory = sqlite3.Row
         self.c.executescript(SCHEMA)
+        cols = {r[1] for r in self.c.execute("PRAGMA table_info(clips)")}
+        if "kind" not in cols:                         # v2: long-form compilations share the table
+            self.c.execute("ALTER TABLE clips ADD COLUMN kind TEXT DEFAULT 'short'")
+            self.c.commit()
 
     # ---- sources
     def get_source(self, source: str, source_id: str):
@@ -53,15 +57,16 @@ class DB:
         return self.c.execute("SELECT * FROM sources WHERE id=?", (row_id,)).fetchone()
 
     def clips_from_source(self, row_id: int) -> list:
-        return self.c.execute("SELECT * FROM clips WHERE source_row=?", (row_id,)).fetchall()
+        return self.c.execute("SELECT * FROM clips WHERE source_row=? AND kind='short'", (row_id,)).fetchall()
 
     # ---- clips
-    def add_clip(self, channel, source_row, start, end, score, judged, video, meta, status="review") -> int:
+    def add_clip(self, channel, source_row, start, end, score, judged, video, meta, status="review",
+                 kind="short") -> int:
         cur = self.c.execute(
-            "INSERT INTO clips(channel,source_row,start,end,score,judged,status,video,meta,created,updated)"
-            " VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+            "INSERT INTO clips(channel,source_row,start,end,score,judged,status,video,meta,created,updated,kind)"
+            " VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
             (channel, source_row, start, end, score, json.dumps(judged), status, str(video),
-             json.dumps(meta), now(), now()))
+             json.dumps(meta), now(), now(), kind))
         self.c.commit()
         return cur.lastrowid
 
@@ -87,7 +92,7 @@ class DB:
     def pipeline_count(self, channel: str) -> int:
         """Shorts made but not yet published (waiting for review, approved, or scheduled in future)."""
         return self.c.execute(
-            "SELECT COUNT(*) FROM clips WHERE channel=? AND (status IN ('review','approved') OR "
+            "SELECT COUNT(*) FROM clips WHERE channel=? AND kind='short' AND (status IN ('review','approved') OR "
             "(status='uploaded' AND publish_at > ?))", (channel, now().replace("+00:00", "Z"))).fetchone()[0]
 
     def uploads_since(self, iso: str) -> int:
@@ -97,3 +102,12 @@ class DB:
     def taken_slots(self, channel: str) -> set[str]:
         rows = self.c.execute("SELECT slot FROM clips WHERE channel=? AND slot IS NOT NULL", (channel,))
         return {r[0] for r in rows}        # un-jittered slot keys
+
+    def recent_shorts(self, channel: str, since_iso: str) -> list:
+        return self.c.execute(
+            "SELECT * FROM clips WHERE channel=? AND kind='short' AND status IN ('approved','uploaded') "
+            "AND created >= ? ORDER BY score DESC", (channel, since_iso)).fetchall()
+
+    def last_long(self, channel: str):
+        return self.c.execute("SELECT * FROM clips WHERE channel=? AND kind='long' ORDER BY id DESC LIMIT 1",
+                              (channel,)).fetchone()

@@ -23,8 +23,17 @@ policy:
                   upscaled, "ai restored", "ai enhanced"]
   max_clips_per_source: 6      # don't milk a single film forever
 
+trends:
+  feeds: [wikipedia_top, on_this_day]   # keyless Wikipedia feeds
+  top_n: 60                    # how many of yesterday's most-read articles to consider
+  max_topics: 8                # topics planned per day (cached in data/trends_<date>.json)
+
 compose:
   renderer: ffmpeg             # ffmpeg (fast) | hyperframes (animated text; needs Node 22+)
+  audio: original              # original (the clip's own sound) | none | music (from ./music)
+  mute_before_year: 1928       # silent-era films: any soundtrack was added later (often copyrighted) -> mute
+  layouts: [top_hook, boxed, lower_third, minimal, label, headline]   # rotated per clip
+  frames: [blur, square, card]
   width: 1080
   height: 1920
   crf: 20
@@ -38,6 +47,16 @@ finder:
   analysis_fps: 4
   skip_edges: 0.06             # ignore first/last 6% (titles, credits)
   candidates_per_source: 8
+
+longform:
+  enabled: true
+  every_days: 7                # one compilation per channel per week
+  lookback_days: 10
+  min_parts: 6                 # wait until this many approved Shorts exist
+  max_parts: 12
+  target_minutes: 9            # parts get extra context around each moment to reach this
+  max_context: 25              # seconds of context added on each side, at most
+  publish_slots: ["20:30"]     # local time for long-form uploads
 
 review:
   require_approval: true       # nothing goes public until you approve it
@@ -58,8 +77,26 @@ youtube:
     min_lead_minutes: 45
 
 channels:
-  - name: classic-comedy
+  - name: archive-trends       # flagship: real archival footage behind what people are reading about today
     enabled: true
+    token: ./secrets/token_archive-trends.json
+    playlist_id: null
+    voice: >-
+      Curious and precise, like a historian who loves a good surprise. Connects today's news to
+      real footage from the past. Plain words, no hype.
+    clip_seconds: [20, 45]
+    buffer: 4
+    sources:
+      - type: trends           # Wikipedia most-read + On this day -> archive searches
+        archives: [internet_archive, nasa]
+        per_topic: 1
+      # evergreen fallback when no trend has footage today
+      - type: internet_archive
+        query: 'collection:(Prelinger_Library OR prelinger) AND subject:(technology OR invention OR transportation)'
+    tags: [history, archive footage, on this day, vintage, documentary]
+
+  - name: classic-comedy
+    enabled: false
     token: ./secrets/token_classic-comedy.json
     playlist_id: null
     voice: >-

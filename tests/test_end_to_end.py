@@ -12,7 +12,6 @@ from autoreel.review import write_review_page
 
 def test_agent_cycle(project):
     cfg = load_config(project / "config.yaml")
-    cfg.channels[0].clip_seconds = [6, 9]
     db = DB(cfg.paths.state_db)
     made = Agent(cfg, db).fill_channel(cfg.channels[0])
     assert made >= 1
@@ -29,7 +28,6 @@ def test_agent_cycle(project):
 
     meta = json.loads(row["meta"])
     assert "Licence: Public domain (test)" in meta["description"]
-    assert "Calm Piano by Test" in meta["description"]
 
     page = write_review_page(cfg, db)
     assert f"#{row['id']}" in page.read_text()
@@ -98,7 +96,8 @@ class FakeLocalLLM:
         assert "cells swarm" in prompt
         return json.dumps({"hook_line1": "Watch them", "hook_line2": "take over the frame",
                            "keyword": "take over", "title": "The busiest shot in The Vagabond",
-                           "description": "Every cell in this shot moves at once. Keep an eye on the left edge."})
+                           "description": "Every cell in this shot moves at once. Keep an eye on the left edge.",
+                           "beats": ["A tramp violinist in 1916", "Every cell moves at once"]})
 
 
 def test_internet_archive_path_with_vision_judge(project, film, monkeypatch):
@@ -109,7 +108,6 @@ def test_internet_archive_path_with_vision_judge(project, film, monkeypatch):
     cfg = load_config(project / "config.yaml")
     ch = cfg.channels[0]
     ch.sources = [{"type": "internet_archive", "query": "x"}]
-    ch.clip_seconds = [6, 9]
     item = internet_archive.to_item(IA_DOC, IA_META)
     monkeypatch.setattr(agent_mod.sources, "discover", lambda spec, page: [item] if page == 1 else [])
     monkeypatch.setattr(agent_mod.sources, "fetch", lambda it, d: film)

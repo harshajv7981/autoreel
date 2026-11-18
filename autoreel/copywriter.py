@@ -61,9 +61,29 @@ def lint(copy: dict, facts: str) -> list[str]:
     if "#" in title:
         problems.append("no hashtags in the title")
 
+    beats = copy.get("beats") or []
+    if not isinstance(beats, list) or not 2 <= len(beats) <= 3:
+        problems.append("beats must be a list of 2-3 short captions")
+        beats = beats if isinstance(beats, list) else []
+    for b in beats:
+        if not isinstance(b, str) or not 8 <= len(b.strip()) <= 70:
+            problems.append("each beat must be 8-70 characters")
+    everything = f"{everything} {' '.join(map(str, beats))}"
+    low = everything.lower()
+    for b in BANNED:
+        if any(re.search(rf"(?<![a-z]){re.escape(b)}(?![a-z])", str(x).lower()) for x in beats):
+            problems.append(f"remove the phrase {b!r}")
+
+    # Honesty: every number and year must come from the facts.
+    known_numbers = set(re.findall(r"\d[\d,.]*", facts))
+    for n in set(re.findall(r"\d[\d,.]*", everything)):
+        if n.rstrip(".,") not in {k.rstrip(".,") for k in known_numbers}:
+            problems.append(f"the number {n.rstrip('.,')!r} is not in the facts - don't invent numbers")
+
     # Honesty: proper names must come from the source facts, never invented.
     known = facts.lower()
-    for name in re.findall(r"(?<![.!?]\s)(?<!^)\b([A-Z][a-z]{2,}(?:\s[A-Z][a-z]{2,})*)", f"{title}. {desc}"):
+    named = f"{title}. {desc}. " + ". ".join(str(b) for b in beats)
+    for name in re.findall(r"(?<![.!?]\s)(?<!^)\b([A-Z][a-z]{2,}(?:\s[A-Z][a-z]{2,})*)", named):
         words = [w for w in name.lower().split() if w not in _stopwords()]
         if words and not all(w in known for w in words):
             problems.append(f"name {name!r} is not in the source facts - don't invent names")
@@ -73,17 +93,20 @@ def lint(copy: dict, facts: str) -> list[str]:
 PROMPT = """You write captions for a YouTube Shorts channel that posts clips from public-domain films.
 Channel voice: {voice}
 
-SOURCE FACTS (the only facts you may use; never invent names, dates or claims):
-- Film: {title} ({year})
-- Notes: {notes}
+SOURCE FACTS (the only facts you may use; never invent names, dates, numbers or claims):
+- Footage: {title} ({year})
+- Archive notes: {notes}
 - What happens in this clip (from frame analysis): {what}
-
+{topic}
 Write JSON with exactly these keys:
 "hook_line1": first line of on-screen text, 2-5 words, sets up the moment
 "hook_line2": second line, 2-5 words, the payoff or tension
 "keyword": one or two words from the hook lines to highlight in colour
 "title": YouTube title, 25-60 characters, sentence case, specific to this clip
 "description": 1-3 short sentences in the channel voice, with one real detail from the facts
+"beats": list of 2-3 on-screen captions shown one after another while the clip plays (each 4-12 words),
+         telling a tiny story with real facts: context, then the surprising detail. There is no voice-over,
+         so the beats carry the story.
 
 Style rules: sound like a person, not an ad. Plain words. No hype words (epic, insane, ultimate,
 legendary, iconic, jaw-dropping), no "you won't believe", no em dashes, no hashtags, at most one
@@ -96,20 +119,30 @@ def template_copy(item, rng: random.Random) -> dict:
     pairs = [("Wait for", "the ending"), ("Nobody saw", "this coming"), ("Watch the", "background"),
              ("Timing is", "everything"), ("One wrong", "step later")]
     l1, l2 = rng.choice(pairs)
-    return {"hook_line1": l1, "hook_line2": l2, "keyword": l2.split()[-1],
+    beats = [f"{who} ({item.year})" if item.year else who, "Real archival footage, public domain"]
+    return {"hook_line1": l1, "hook_line2": l2, "keyword": l2.split()[-1], "beats": beats,
             "title": f"A moment from {who}"[:70] if len(who) > 4 else "A moment from a silent classic",
             "description": f"A clip from {item.title}{f' ({item.year})' if item.year else ''}."}
 
 
-def write(llm, item, judged: dict, voice: str, seed: int, attempts: int = 3) -> dict:
+def topic_block(topic) -> str:
+    if not topic:
+        return ""
+    return (f"- Why this matters today: {topic.why}\n- Today's topic: {topic.title}. {topic.angle}\n"
+            f"- Topic facts (Wikipedia): {topic.facts[:900]}\n")
+
+
+def write(llm, item, judged: dict, voice: str, seed: int, attempts: int = 3, topic=None) -> dict:
     rng = random.Random(seed)
     facts = f"{item.title} {item.year or ''} {item.text} {judged.get('what_happens', '')}"
+    if topic:
+        facts += f" {topic.title} {topic.why} {topic.facts}"
     feedback = ""
     for i in range(attempts):
         raw = llm.text(PROMPT.format(voice=voice, title=item.title, year=item.year or "unknown",
                                      notes=item.text[:600] or "none",
                                      what=judged.get("what_happens") or "not available",
-                                     feedback=feedback), as_json=True)
+                                     topic=topic_block(topic), feedback=feedback), as_json=True)
         copy = parse_json(raw)
         if not copy:
             break
@@ -124,9 +157,10 @@ def write(llm, item, judged: dict, voice: str, seed: int, attempts: int = 3) -> 
     return copy
 
 
-def description(copy: dict, item, music_credit: str | None, tags: list[str]) -> str:
+def description(copy: dict, item, music_credit: str | None, tags: list[str], topic_url: str | None = None) -> str:
     """Final description: the human-written blurb + honest provenance (helps with Content ID disputes)."""
     lines = [copy["description"].strip(), "",
+             f"Background: {topic_url}" if topic_url else None,
              f"From: {item.title}{f' ({item.year})' if item.year else ''}",
              f"Licence: {item.licence}",
              f"Source: {item.page_url}" if item.page_url else "",
