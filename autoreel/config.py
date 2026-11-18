@@ -46,6 +46,12 @@ def load_config(path: str | Path) -> Cfg:
         lo, hi = ch.clip_seconds
         if hi > cap:                 # claimed Shorts over 60s are blocked outright
             ch.clip_seconds = [min(lo, cap - 5), cap]
+        rk = ch.get("ranking")
+        if rk and rk.get("enabled"):
+            n = int(rk.get("items", 5))
+            lo_i, hi_i = rk.get("item_seconds", [6, 9])
+            if n * hi_i > cap - 2:   # whole ranking must stay under a minute
+                rk["item_seconds"] = [min(lo_i, (cap - 2) // n - 1), (cap - 2) // n]
         ch.token = res(ch.token)
         for src in ch.sources:
             if src.get("folder"):

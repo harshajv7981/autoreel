@@ -50,6 +50,21 @@ Reality check from the same audit: archive long-form earns roughly $2-3 per 1,00
 about $0.17-0.33 even in the US/UK, and a solo archival channel can sit near zero for months. One video
 making nearly all of a channel's views has also triggered YPP reviews. Plan for slow growth and steady variety.
 
+## "Top 5" ranking Shorts
+
+The ranking format popular with clip channels, built only from licensed footage:
+
+* **Themes** per channel, e.g. "knockouts from old newsreels", "stunts filmed for real", "racing crashes
+  and near misses". Each theme has keywords matched against the films already downloaded and licence-checked.
+* **Picking:** short 6-9 second moments are found in matching films, rated by the vision model (or motion
+  when no model is set), and ranked. At most two moments come from one film.
+* **Packaging:** items play in a shuffled order with #1 always last (never a plain countdown), each with
+  a rank badge (#1 in gold), a 2-4 word label grounded in what the frames show, and its own source credit.
+  A short flash and tick mark each change; the whole video stays under 58 seconds.
+* **No repeats:** every span used by a ranking is recorded, so neither single Shorts nor later rankings reuse it.
+* **Settings:** `channels[].ranking` - `share` (about 1 in 3 Shorts), `items`, `item_seconds`, `themes`.
+  On by default for `sports-action-history` (and `classic-comedy` when enabled).
+
 ## Cricket & football stat Shorts
 
 `cricket-football-stats` makes animated charts from match data: no footage, photos or logos, so
@@ -212,6 +227,7 @@ run.py                     CLI
 autoreel/agent.py          the agent loop (trends → discover → judge → write → compose → queue)
 autoreel/trends.py         trend radar (Wikipedia most-read, On this day) + topic planning
 autoreel/longform.py       weekly 16:9 compilation with chapters
+autoreel/ranking.py        Top-N ranking Shorts from licensed footage
 autoreel/stats/            stat Shorts: football + cricket data, chart renderer, story maker
 autoreel/sources/          internet_archive, nasa, local + licence policy
 autoreel/finder.py         visual moment finder
@@ -220,5 +236,5 @@ autoreel/compose/          ffmpeg composer, 6 ASS layouts, HyperFrames overlay
 autoreel/review.py         review page + Telegram approvals
 autoreel/publisher.py      scheduling + YouTube upload
 templates/hyperframes/     HTML overlay template (+ vendored GSAP)
-tests/                     45 tests, including full agent cycles and long-form builds
+tests/                     48 tests, including full agent cycles and long-form builds
 ```

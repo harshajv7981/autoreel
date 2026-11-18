@@ -91,7 +91,7 @@ class Agent:
                               fps=self.cfg.finder.analysis_fps, skip_edges=self.cfg.finder.skip_edges):
             if made >= min(want, room):
                 break
-            if any(m.start < c["end"] and m.end > c["start"] for c in existing):
+            if any(m.start < b and m.end > a for a, b in self.db.used_spans(source_row)):
                 continue
             verdict = self.judge(video, m.start, m.end, item, ch.voice, topic, ch.get("judge_hint") or "")
             if not verdict["keep"]:
@@ -185,7 +185,12 @@ class Agent:
             log.info("%s: buffer full", ch.name)
             return 0
         log.info("%s: making %d new Short(s)", ch.name, need)
+        rk = ch.get("ranking") or {}
+        n_rank = round(need * float(rk.get("share", 0.34))) if rk.get("enabled") else 0
         made = 0
+        if n_rank and self.db.usable_sources():         # footage already on disk: rankings first
+            from . import ranking
+            made += ranking.make(self, ch, n_rank)
         for spec in ch.sources:
             if made >= need:
                 break

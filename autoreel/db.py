@@ -16,6 +16,7 @@ CREATE TABLE IF NOT EXISTS clips(
   status TEXT, video TEXT, meta TEXT, youtube_id TEXT, publish_at TEXT, slot TEXT, error TEXT,
   created TEXT, updated TEXT);
 CREATE INDEX IF NOT EXISTS clips_status ON clips(status);
+CREATE TABLE IF NOT EXISTS segments(clip_id INTEGER, source_row INTEGER, start REAL, end REAL);
 """
 
 
@@ -49,7 +50,8 @@ class DB:
             "INSERT INTO sources(source,source_id,title,year,page_url,download_url,licence,credit,"
             "local_path,status,reason,meta,created) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
             (item.source, item.source_id, item.title, item.year, item.page_url, item.download_url,
-             item.licence, item.credit, local_path, status, reason, json.dumps(item.meta), now()))
+             item.licence, item.credit, local_path, status, reason,
+             json.dumps({**item.meta, "text": (item.text or "")[:2000]}), now()))
         self.c.commit()
         return cur.lastrowid
 
@@ -58,6 +60,22 @@ class DB:
 
     def clips_from_source(self, row_id: int) -> list:
         return self.c.execute("SELECT * FROM clips WHERE source_row=? AND kind='short'", (row_id,)).fetchall()
+
+    def used_spans(self, row_id: int) -> list[tuple[float, float]]:
+        """Every span of a source already used, by single Shorts or by ranking items."""
+        spans = [(r["start"], r["end"]) for r in self.clips_from_source(row_id)]
+        spans += [(r[0], r[1]) for r in self.c.execute(
+            "SELECT s.start, s.end FROM segments s JOIN clips c ON c.id=s.clip_id "
+            "WHERE s.source_row=? AND c.status != 'rejected'", (row_id,))]
+        return spans
+
+    def add_segments(self, clip_id: int, segs: list[tuple[int, float, float]]):
+        self.c.executemany("INSERT INTO segments VALUES (?,?,?,?)", [(clip_id, r, a, b) for r, a, b in segs])
+        self.c.commit()
+
+    def usable_sources(self) -> list:
+        return self.c.execute("SELECT * FROM sources WHERE status IN ('ok','exhausted') AND local_path IS NOT NULL "
+                              "AND source != 'stats'").fetchall()
 
     # ---- clips
     def add_clip(self, channel, source_row, start, end, score, judged, video, meta, status="review",

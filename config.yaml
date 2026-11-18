@@ -149,6 +149,22 @@ channels:
       - type: internet_archive   # pre-{pd_cutoff} films: early sport, motor racing, aviation stunts, silent-film stunts
         query: '(subject:(boxing OR baseball OR football OR soccer OR cricket OR "auto racing" OR olympics OR rodeo OR "air race" OR stunt OR "Harold Lloyd" OR "Buster Keaton" OR "Douglas Fairbanks")) AND year:[1895 TO {pd_cutoff}]'
     tags: [sports history, vintage sports, boxing, football history, old newsreel, stunts]
+    ranking:                   # "Top 5" Shorts: shuffled order, #1 last, rank badges
+      enabled: true
+      share: 0.34              # about one in three Shorts is a ranking
+      items: 5
+      item_seconds: [6, 9]
+      themes:
+        - {name: knockouts from old newsreels, keywords: [boxing, bout, heavyweight, fight, prizefight],
+           angle: the hardest-hitting moments in old boxing footage}
+        - {name: racing crashes and near misses, keywords: [racing, race, speedway, crash, auto, motorcycle, indianapolis],
+           angle: early motor racing at its most dangerous}
+        - {name: stunts filmed for real, keywords: [stunt, lloyd, keaton, fairbanks, daredevil, acrobat],
+           angle: real stunts from the days before special effects}
+        - {name: flying moments, keywords: [air race, airplane, aviation, flying, pilot, parachute, airship],
+           angle: early aviators and their wildest moments}
+        - {name: ball game moments, keywords: [baseball, football, soccer, cricket, rugby, tennis],
+           angle: how ball games looked in old newsreels}
 
   - name: cricket-football-stats   # animated stat Shorts from match data: no footage, photos or logos
     enabled: true
@@ -174,6 +190,14 @@ channels:
   - name: classic-comedy
     enabled: false
     token: ./secrets/token_classic-comedy.json
+    ranking:
+      enabled: true
+      share: 0.34
+      items: 5
+      item_seconds: [6, 9]
+      themes:
+        - {name: falls in silent comedy, keywords: [comedy, slapstick, chaplin, keaton, lloyd], angle: the best pratfalls}
+        - {name: chase scenes, keywords: [comedy, slapstick, keystone, chase], angle: silent-era chases}
     playlist_id: null
     voice: >-
       Dry, playful, a little cheeky. Talks like a film nerd showing a friend a gag.
