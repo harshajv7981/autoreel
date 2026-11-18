@@ -1,0 +1,14 @@
+[Unit]
+Description=AutoReel Shorts agent
+After=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/autoreel
+ExecStart=/usr/bin/python3 /opt/autoreel/run.py daemon --every 60
+Restart=on-failure
+RestartSec=300
+User=autoreel
+
+[Install]
+WantedBy=multi-user.target

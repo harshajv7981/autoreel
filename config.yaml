@@ -1,0 +1,103 @@
+# AutoReel configuration. Paths are relative to this file.
+
+paths:
+  data: ./data                 # downloads, work files, renders
+  music: ./music               # drop royalty-free tracks here (e.g. Mixkit, no account needed)
+  secrets: ./secrets           # client_secret.json + per-channel tokens (never commit)
+  state_db: ./data/autoreel.db
+
+llm:
+  provider: ollama             # ollama (local, free, no sign-up) | anthropic | none
+  ollama_url: http://localhost:11434
+  text_model: qwen2.5:7b
+  vision_model: qwen2.5vl:7b   # rates candidate moments from sampled frames; none = motion score only
+  anthropic_model: claude-sonnet-5-5
+  temperature: 0.8
+
+policy:
+  # US public domain: works published in year Y are public domain from Jan 1 of Y+96.
+  # The cutoff year is computed automatically from today's date.
+  trusted_pd_collections: [prelinger, prelinger_library, ephemera]  # vetted by the archive itself
+  blocked_terms: [ai generated, ai-generated, generated with, midjourney, sora, runway gen,
+                  stable diffusion, synthetic, deepfake, "made with ai", colorized, colourized,
+                  upscaled, "ai restored", "ai enhanced"]
+  max_clips_per_source: 6      # don't milk a single film forever
+
+compose:
+  renderer: ffmpeg             # ffmpeg (fast) | hyperframes (animated text; needs Node 22+)
+  width: 1080
+  height: 1920
+  crf: 20
+  preset: veryfast
+  loudness_lufs: -14
+  music_volume: 0.85
+  grain: true                  # subtle film grain + slight colour variance so renders don't look templated
+  hyperframes_version: 0.9.65
+
+finder:
+  analysis_fps: 4
+  skip_edges: 0.06             # ignore first/last 6% (titles, credits)
+  candidates_per_source: 8
+
+review:
+  require_approval: true       # nothing goes public until you approve it
+  telegram_bot_token: null     # optional: approve from your phone (see README)
+  telegram_chat_id: null
+
+youtube:
+  client_secret: ./secrets/client_secret.json
+  category_id: "24"            # 24 = Entertainment
+  made_for_kids: false
+  default_language: en
+  max_uploads_per_day: 6       # across all channels; API default bucket is 100/day
+  set_thumbnail: false         # Shorts ignore custom thumbnails
+  schedule:
+    timezone: Asia/Kolkata
+    slots: ["12:40", "19:10"]  # local times; each slot gets one Short per channel
+    jitter_minutes: 11         # small random offset so posting times look human
+    min_lead_minutes: 45
+
+channels:
+  - name: classic-comedy
+    enabled: true
+    token: ./secrets/token_classic-comedy.json
+    playlist_id: null
+    voice: >-
+      Dry, playful, a little cheeky. Talks like a film nerd showing a friend a gag.
+      Never shouts, never uses hype words.
+    clip_seconds: [18, 40]
+    buffer: 4                  # keep this many Shorts ready ahead of schedule
+    sources:
+      - type: internet_archive
+        query: 'collection:(silent_films) AND (subject:(comedy) OR subject:(slapstick) OR collection:(Comedy_Films))'
+      - type: internet_archive
+        query: 'subject:("Charlie Chaplin" OR "Buster Keaton" OR "Harold Lloyd" OR "Laurel and Hardy")'
+    tags: [silent film, classic comedy, slapstick, old movies, film history]
+
+  - name: space-moments
+    enabled: false
+    token: ./secrets/token_space-moments.json
+    playlist_id: null
+    voice: Calm, curious, precise. Shares one surprising fact per clip.
+    clip_seconds: [15, 35]
+    buffer: 4
+    sources:
+      - type: nasa
+        query: rocket launch
+      - type: nasa
+        query: spacewalk
+    tags: [space, nasa, rocket launch, astronomy]
+
+  - name: wild-animals
+    enabled: false
+    token: ./secrets/token_wild-animals.json
+    playlist_id: null
+    voice: Warm and observant, like a park ranger who loves their job.
+    clip_seconds: [15, 35]
+    buffer: 4
+    sources:
+      # Download public-domain b-roll from NPS / USGS / USFWS pages into this folder
+      # and put a licence.json next to the files (see README).
+      - type: local
+        folder: ./inbox/animals
+    tags: [wildlife, animals, nature, national parks]

@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en" data-resolution="portrait">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1080, height=1920" />
+    <script src="assets/gsap.min.js"></script>
+    <style>
+      :root {
+        --accent: __ACCENT__;
+        --ink: #ffffff;
+        --font-display: "__FONT__", "Inter", "DejaVu Sans", sans-serif;
+      }
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body { width: 1080px; height: 1920px; overflow: hidden; background: #000; }
+      #root { position: relative; width: 1080px; height: 1920px; font-family: var(--font-display); }
+      .clip { position: absolute; inset: 0; }
+      #base { width: 1080px; height: 1920px; object-fit: cover; }
+      #hook {
+        position: absolute; inset: auto; left: 60px; right: 60px; top: __TOP__px; text-align: center;
+        color: var(--ink); font-weight: 800; font-size: 86px; line-height: 1.08;
+        letter-spacing: -0.02em; text-shadow: 0 4px 0 #000, 0 0 18px rgba(0,0,0,.65);
+        -webkit-text-stroke: 3px #000; paint-order: stroke fill;
+      }
+      #hook .line { display: block; }
+      #hook .kw { color: var(--accent); }
+      #credit {
+        position: absolute; inset: auto; left: 60px; right: 60px; bottom: 110px; text-align: center;
+        color: rgba(255,255,255,.78); font-size: 30px; font-weight: 500;
+        text-shadow: 0 2px 6px rgba(0,0,0,.8);
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="__DUR__"
+         data-width="1080" data-height="1920">
+      <video id="base" class="clip" src="assets/base.mp4" data-start="0" data-duration="__DUR__"
+             data-track-index="0" data-has-audio="true"></video>
+      <div id="hook" class="clip" data-start="0" data-duration="__DUR__" data-track-index="1">
+        <span class="line" id="l1">__LINE1__</span>
+        <span class="line" id="l2">__LINE2__</span>
+      </div>
+      <div id="credit" class="clip" data-start="0" data-duration="__DUR__" data-track-index="2">__CREDIT__</div>
+    </div>
+    <script>
+      window.__timelines = window.__timelines || {};
+      const tl = gsap.timeline({ paused: true });
+      tl.fromTo("#l1", { y: 40, opacity: 0 }, { y: 0, opacity: 1, duration: 0.35, ease: "power3.out" }, 0.05);
+      tl.fromTo("#l2", { y: 40, opacity: 0 }, { y: 0, opacity: 1, duration: 0.35, ease: "power3.out" }, 0.3);
+      tl.fromTo("#hook .kw", { scale: 1.25 }, { scale: 1, duration: 0.3, ease: "back.out(2)" }, 0.55);
+      tl.fromTo("#credit", { opacity: 0 }, { opacity: 1, duration: 0.6 }, 0.8);
+      window.__timelines["main"] = tl;
+      tl.seek(0);
+    </script>
+  </body>
+</html>

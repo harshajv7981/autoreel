@@ -221,3 +221,12 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# AutoReel
+secrets/
+data/
+music/*
+!music/.keep
+inbox/**/*.mp4
+__pycache__/
+.pytest_cache/
