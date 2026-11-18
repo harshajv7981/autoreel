@@ -85,6 +85,7 @@ class Policy:
         self.trusted = {c.lower() for c in cfg.policy.trusted_pd_collections}
         self.gov = {c.lower() for c in cfg.policy.get("gov_collections", [])}
         self.cid_risk = [t.lower() for t in cfg.policy.get("content_id_risk_terms", [])]
+        self.pd_releases = list(cfg.policy.get("pd_releases", []))
         self.cutoff = us_pd_cutoff()
 
     def check(self, item: SourceItem) -> tuple[bool, str]:
@@ -104,6 +105,11 @@ class Policy:
                 return True, f"published {item.year} (US public domain, cutoff {self.cutoff})"
             if collections & self.gov:
                 return True, "US federal government work (public domain, 17 U.S.C. 105)"
+            for rel in self.pd_releases:
+                lo, hi = rel["years"]
+                if rel["match"].lower() in f"{item.title} {' '.join(collections)}".lower() \
+                        and item.year and lo <= item.year <= hi:
+                    return True, rel.get("reason", "released into the public domain")
             if collections & self.trusted and ("publicdomain" in lic or "/zero/" in lic or "mark" in lic):
                 return True, "archive-vetted public-domain collection"
             return False, f"year {item.year} after cutoff {self.cutoff} and not in a vetted PD collection"

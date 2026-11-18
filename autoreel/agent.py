@@ -31,6 +31,7 @@ Return JSON:
 "keep": true or false,
 "reason": short reason.
 
+{hint}
 Set keep=false if the frames are mostly a title card or text, blank or dark, show a TV-channel logo or
 watermark, show real injury or cruelty, or show nothing happening."""
 
@@ -50,7 +51,7 @@ class Agent:
         self.renders = cfg.paths.data / "renders"
 
     # ------------------------------------------------------------ judging
-    def judge(self, video: Path, start: float, end: float, item, voice: str, topic=None) -> dict:
+    def judge(self, video: Path, start: float, end: float, item, voice: str, topic=None, hint: str = "") -> dict:
         motion_only = {"what_happens": "", "score": None, "keep": True, "reason": "motion score only"}
         if not self.llm.available():
             return motion_only
@@ -60,7 +61,8 @@ class Agent:
         topic_line = f"The Short is about today's topic: {topic.title}. Angle: {topic.angle}\n" if topic else ""
         fit = " and how well it fits the topic" if topic else ""
         raw = self.llm.vision(JUDGE_PROMPT.format(voice=voice, n=len(frames), length=L, title=item.title,
-                                                  year=item.year or "unknown", topic=topic_line, fit=fit),
+                                                  year=item.year or "unknown", topic=topic_line, fit=fit,
+                                                  hint=hint),
                               frames, as_json=True)
         verdict = parse_json(raw)
         if not verdict:
@@ -91,7 +93,7 @@ class Agent:
                 break
             if any(m.start < c["end"] and m.end > c["start"] for c in existing):
                 continue
-            verdict = self.judge(video, m.start, m.end, item, ch.voice, topic)
+            verdict = self.judge(video, m.start, m.end, item, ch.voice, topic, ch.get("judge_hint") or "")
             if not verdict["keep"]:
                 log.info("judge rejected %.0f-%.0fs: %s", m.start, m.end, verdict.get("reason"))
                 continue
@@ -198,7 +200,9 @@ class Agent:
 
     def _fill_from_trends(self, ch, spec, need: int) -> int:
         topics = trends.todays_topics(self.cfg, self.llm, self.cfg.paths.data, self.policy.cutoff,
-                                      max_topics=self.cfg.trends.max_topics)
+                                      max_topics=self.cfg.trends.max_topics,
+                                      allow_sports=bool(spec.get("allow_sports")),
+                                      sports_only=bool(spec.get("sports_only")))
         made = 0
         per_topic = max(1, int(spec.get("per_topic", 1)))
         for topic in topics:

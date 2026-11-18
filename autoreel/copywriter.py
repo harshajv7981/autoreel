@@ -29,6 +29,13 @@ def _stopwords():
             "no", "not", "one", "just", "then", "every", "watch", "wait", "nobody", "somebody", "film"}
 
 
+def era_cue_missing(copy: dict) -> bool:
+    """Sports Shorts must say the footage is old, so nobody mistakes it for the current match."""
+    text = " ".join([copy.get("title", ""), copy.get("hook_line1", ""), copy.get("hook_line2", ""),
+                     *map(str, copy.get("beats") or [])]).lower()
+    return not re.search(r"\b(18\d\d|19[0-6]\d)s?\b|years ago|decades ago|century ago|back then|in the (19)?[0-6]0s", text)
+
+
 def lint(copy: dict, facts: str) -> list[str]:
     """Return a list of problems (empty = good)."""
     problems = []
@@ -159,8 +166,11 @@ def template_copy(item, rng: random.Random) -> dict:
 def topic_block(topic) -> str:
     if not topic:
         return ""
+    note = ("- IMPORTANT: this footage is decades old, not from today's event. The title, hook or a beat must make\n"
+            "  that clear with the footage's year or 'years ago'. Never name current players, teams or leagues' logos.\n"
+            if getattr(topic, "kind", "") == "sport" else "")
     return (f"- Why this matters today: {topic.why}\n- Today's topic: {topic.title}. {topic.angle}\n"
-            f"- Topic facts (Wikipedia): {topic.facts[:900]}\n")
+            f"- Topic facts (Wikipedia): {topic.facts[:900]}\n{note}")
 
 
 def write(llm, item, judged: dict, voice: str, seed: int, attempts: int = 3, topic=None) -> dict:
@@ -186,6 +196,8 @@ def write(llm, item, judged: dict, voice: str, seed: int, attempts: int = 3, top
                 continue
             cand = {**shared, **{k: str(opt.get(k, "")) for k in ("hook_line1", "hook_line2", "keyword", "title")}}
             problems = lint(cand, facts)
+            if getattr(topic, "kind", "") == "sport" and era_cue_missing(cand):
+                problems = problems + ["say the footage is old: include its year or 'years ago' in the title, hook or a beat"]
             if problems:
                 problems_all += problems
             else:

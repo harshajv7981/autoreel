@@ -6,7 +6,10 @@ from .base import Policy, SourceItem, download  # noqa: F401
 
 
 def discover(spec, page: int = 1):
+    from .base import us_pd_cutoff
     kind = spec["type"]
+    if "query" in spec and "{pd_cutoff}" in str(spec["query"]):
+        spec = {**spec, "query": str(spec["query"]).replace("{pd_cutoff}", str(us_pd_cutoff()))}
     if kind == "internet_archive":
         return internet_archive.discover(spec["query"], rows=spec.get("rows", 30), page=page)
     if kind == "nasa":

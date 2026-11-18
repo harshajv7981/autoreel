@@ -50,6 +50,25 @@ Reality check from the same audit: archive long-form earns roughly $2-3 per 1,00
 about $0.17-0.33 even in the US/UK, and a solo archival channel can sit near zero for months. One video
 making nearly all of a channel's views has also triggered YPP reviews. Plan for slow growth and steady variety.
 
+## Sports & action channel
+
+`sports-action-history` posts real sport and stunts from **1895-1967**, never modern matches.
+
+* **Why not modern cricket/football?** League, board and broadcaster footage is fingerprinted and enforced hard:
+  long-running archive channels have been terminated after copyright strikes, and boards have sent legal
+  letters over even logos and still photos. One channel termination ends the project, so modern
+  match footage, player photos and league logos are never used.
+* **Where the footage comes from:** Universal Newsreels (1929-1967), which MCA/Universal gave to the
+  US National Archives without copyright restrictions (accepted via `policy.pd_releases`), plus any
+  film published up to the current US public-domain year (`{pd_cutoff}` in queries): early boxing,
+  baseball, football, motor racing, air races, rodeo, and silent-film stunts (Lloyd, Keaton, Fairbanks).
+* **Trends:** when a sport trends (World Cup, IPL, Ashes, Olympics, Super Bowl), the planner searches the
+  *old* sport ("soccer newsreel"), never current names. Player pages are never used. Captions must
+  say the footage is old (a year or "years ago"), so nobody mistakes it for today's match.
+* **Expect:** US sports (boxing, baseball, American football, racing) are well covered. Vintage cricket and
+  UK football are thin: most of it sits with British Pathé, the BFI, Reuters/ITN and India's Films Division,
+  which claim their copies, so those sources are filtered out.
+
 ## Why there's no AI label
 
 YouTube labels **realistic altered or synthetic** content: AI-generated people, voices, places or events.
@@ -177,5 +196,5 @@ autoreel/compose/          ffmpeg composer, 6 ASS layouts, HyperFrames overlay
 autoreel/review.py         review page + Telegram approvals
 autoreel/publisher.py      scheduling + YouTube upload
 templates/hyperframes/     HTML overlay template (+ vendored GSAP)
-tests/                     35 tests, including full agent cycles and long-form builds
+tests/                     40 tests, including full agent cycles and long-form builds
 ```

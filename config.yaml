@@ -24,6 +24,11 @@ policy:
   trusted_pd_collections: [prelinger, prelinger_library, ephemera]  # vetted by the archive itself
   # US federal government works are public domain whatever their year (17 U.S.C. 105)
   gov_collections: [fedflix, nasa, usnationalarchives, nationalarchives]
+  # Collections a rights-holder released into the public domain, accepted within their years
+  pd_releases:
+    - match: universal newsreel          # MCA/Universal gave its 1929-1967 newsreels to the
+      years: [1929, 1967]                # National Archives without copyright restrictions
+      reason: Universal Newsreels, released into the public domain by MCA/Universal
   blocked_terms: [ai generated, ai-generated, generated with, midjourney, sora, runway gen,
                   stable diffusion, synthetic, deepfake, "made with ai", colorized, colourized,
                   upscaled, "ai restored", "ai enhanced"]
@@ -34,7 +39,9 @@ policy:
                           "british pathe", "british pathé", "pathe news", "reuters", "ap archive",
                           "periscope film", "periscopefilm", "criticalpast", "critical past",
                           "huntley film", "kinolibrary", "pond5", "getty images", "shutterstock",
-                          "film archives inc", "watermark"]
+                          "film archives inc", "watermark", "movietone", "gaumont", "hearst metrotone",
+                          "metrotone", "screenocean", "itn source", " bfi ", "films division",
+                          "star sports", "sky sports", "espn", "bcci", "icc ", "fifa+", "premier league productions"]
   max_clips_per_source: 6      # don't milk a single film forever
 
 trends:
@@ -118,6 +125,30 @@ channels:
       - type: internet_archive   # US government films: Cold War, aviation, engineering
         query: 'collection:(FedFlix) AND subject:(aviation OR nuclear OR space OR engineering OR navy)'
     tags: [history, archive footage, on this day, vintage, documentary]
+
+  - name: sports-action-history   # real sports and stunts from 1900-1967 newsreels; never modern matches
+    enabled: true
+    token: ./secrets/token_sports-action-history.json
+    playlist_id: null
+    voice: >-
+      Energetic but plain-spoken, like a sports historian who can't believe what athletes did back then.
+      Short sentences. Always makes clear the footage is decades old.
+    judge_hint: >-
+      Score the peak of the action highest: a knockout, a goal or touchdown, a crash, a photo finish,
+      a stunt landing. Low scores for crowd shots, line-ups and people standing around.
+    clip_seconds: [12, 30]
+    buffer: 4
+    sources:
+      - type: trends           # when a sport trends (World Cup, Ashes, IPL, Olympics), show how it looked then
+        archives: [internet_archive]
+        allow_sports: true
+        sports_only: true
+        per_topic: 1
+      - type: internet_archive   # Universal Newsreels 1929-1967 (public domain)
+        query: 'title:("universal newsreel") AND (description:(sports OR boxing OR baseball OR football OR soccer OR racing OR olympics OR rodeo OR stunt OR air race) OR subject:(sports))'
+      - type: internet_archive   # pre-{pd_cutoff} films: early sport, motor racing, aviation stunts, silent-film stunts
+        query: '(subject:(boxing OR baseball OR football OR soccer OR cricket OR "auto racing" OR olympics OR rodeo OR "air race" OR stunt OR "Harold Lloyd" OR "Buster Keaton" OR "Douglas Fairbanks")) AND year:[1895 TO {pd_cutoff}]'
+    tags: [sports history, vintage sports, boxing, football history, old newsreel, stunts]
 
   - name: classic-comedy
     enabled: false

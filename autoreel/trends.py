@@ -27,9 +27,13 @@ META = re.compile(r"^(Main_Page|Special:|Wikipedia:|File:|Portal:|Help:|Talk:|Ca
 AVOID = re.compile(r"(\b(19[4-9]\d|20\d\d)_?(film|TV_series|season|video_game|album|song)\b|"
                    r"_\((film|TV_series|album|song|video_game|singer|rapper|actor|actress|footballer|"
                    r"cricketer|politician|YouTuber|influencer|wrestler)\)|"
-                   r"_F\.C\.|_FC\b|football_club|Premier_League|Champions_League|World_Cup_qualif|Indian_Premier_League|NFL|NBA|UFC|"
-                   r"Cricket_World_Cup|Grand_Prix|shooting|massacre|murder|killing|attack|death_of|"
+                   r"_F\.C\.|_FC\b|football_club|shooting|massacre|murder|killing|attack|death_of|"
                    r"OnlyFans|pornograph|ChatGPT|Squid_Game)", re.I)
+# Sports topics: only for channels that allow them, and only ever shown with HISTORIC footage of the sport.
+SPORT = re.compile(r"(cricket|ashes|indian_premier_league|\bipl\b|t20|test_match|football|soccer|fifa|world_cup|"
+                   r"premier_league|champions_league|la_liga|euro_20|copa|olympic|boxing|heavyweight|wimbledon|"
+                   r"grand_prix|formula_one|\bf1\b|indianapolis|super_bowl|\bnfl\b|\bnba\b|world_series|"
+                   r"baseball|rugby|tour_de_france|marathon|\bufc\b|wrestling|horse_racing|kentucky_derby)", re.I)
 SPACE = re.compile(r"\b(nasa|apollo|artemis|moon|lunar|mars|rover|rocket|launch|space|shuttle|iss|"
                    r"astronaut|orbit|hubble|webb|saturn|jupiter|eclipse|comet|meteor|satellite|spacex)\b", re.I)
 
@@ -44,6 +48,7 @@ class Topic:
     year: int | None = None         # event year for On-this-day items
     queries: dict = field(default_factory=dict)   # {"internet_archive": "...", "nasa": "..."}
     angle: str = ""
+    kind: str = "general"           # general | sport
 
     def to_json(self) -> dict:
         return asdict(self)
@@ -80,7 +85,11 @@ def summary(title: str) -> dict:
         return {}
 
 
-def candidates(cfg, today: date | None = None) -> list[Topic]:
+def _kind(title: str) -> str:
+    return "sport" if SPORT.search(title.replace(" ", "_")) else "general"
+
+
+def candidates(cfg, today: date | None = None, allow_sports: bool = False, sports_only: bool = False) -> list[Topic]:
     today = today or date.today()
     tcfg = cfg.trends
     topics: list[Topic] = []
@@ -89,7 +98,7 @@ def candidates(cfg, today: date | None = None) -> list[Topic]:
             if AVOID.search(article):
                 continue
             topics.append(Topic(_title(article), f"#{rank} most-read on Wikipedia yesterday ({views:,} views)",
-                                score=1.0 + (tcfg.top_n - rank) / tcfg.top_n))
+                                score=1.0 + (tcfg.top_n - rank) / tcfg.top_n, kind=_kind(article)))
     if "on_this_day" in tcfg.feeds:
         for ev in on_this_day(today):
             pages = ev.get("pages") or []
@@ -104,7 +113,9 @@ def candidates(cfg, today: date | None = None) -> list[Topic]:
             round_bonus = 0.6 if anniversary and anniversary % 25 == 0 else 0.0
             topics.append(Topic(t, f"On this day in {yr}: {ev.get('text', '')}"[:300], score=0.8 + round_bonus,
                                 facts=p.get("extract", ""), url=(p.get("content_urls") or {}).get("desktop", {})
-                                .get("page", ""), year=yr if isinstance(yr, int) else None))
+                                .get("page", ""), year=yr if isinstance(yr, int) else None,
+                                kind=_kind(f"{t} {ev.get('text', '')}")))
+    topics = [t for t in topics if (t.kind == "sport" and allow_sports) or (t.kind != "sport" and not sports_only)]
     boost = [b.lower() for b in tcfg.get("boost_terms", [])]
     for t in topics:
         hay = f" {t.title} {t.why} {t.facts[:300]} ".lower()
@@ -131,9 +142,15 @@ Can real archival footage honestly illustrate this topic? Think of the history b
 event of the same kind, or the place/technology/animal itself. If it's about a living celebrity,
 a recent death or tragedy, a current sports match, or a new film/show, answer skip.
 
+{sport_rule}
 Return JSON: {{"skip": true/false, "reason": "...", "angle": "one sentence: what the Short shows and why it's
 relevant today", "internet_archive_query": "2-5 plain search words for old films/newsreels, or null",
 "nasa_query": "2-4 words if space-related, else null"}}"""
+
+SPORT_RULE = """This is a SPORTS topic. Current matches, players, leagues' footage, logos and photos are off-limits.
+The only allowed angle is historic footage of the same sport from old newsreels (before 1968), e.g. "how
+football looked in the 1930s" or "boxing's heavyweight title fights a century ago". The search words must
+describe the old sport (e.g. "soccer match newsreel", "heavyweight boxing fight"), never current names."""
 
 
 def plan(topic: Topic, llm, cutoff: int) -> Topic | None:
@@ -142,7 +159,9 @@ def plan(topic: Topic, llm, cutoff: int) -> Topic | None:
         topic.facts = (s.get("extract") or "")[:1200]
         topic.url = topic.url or (s.get("content_urls") or {}).get("desktop", {}).get("page", "")
     raw = llm.text(PLAN_PROMPT.format(cutoff=cutoff + 1, title=topic.title, why=topic.why,
-                                      facts=topic.facts[:900] or "none"), as_json=True) if llm.available() else None
+                                      facts=topic.facts[:900] or "none",
+                                      sport_rule=SPORT_RULE if topic.kind == "sport" else ""),
+                   as_json=True) if llm.available() else None
     data = parse_json(raw)
     if data:
         if data.get("skip"):
@@ -153,6 +172,22 @@ def plan(topic: Topic, llm, cutoff: int) -> Topic | None:
             topic.queries["internet_archive"] = data["internet_archive_query"]
         if data.get("nasa_query"):
             topic.queries["nasa"] = data["nasa_query"]
+    elif topic.kind == "sport":   # no model: search the old sport, never the current event's names
+        m = SPORT.search(topic.title.replace(" ", "_"))
+        sport = {"ipl": "cricket", "ashes": "cricket", "t20": "cricket", "test_match": "cricket",
+                 "fifa": "soccer", "world_cup": "soccer", "premier_league": "soccer", "champions_league": "soccer",
+                 "la_liga": "soccer", "copa": "soccer", "euro_20": "soccer", "heavyweight": "boxing",
+                 "grand_prix": "auto racing", "formula_one": "auto racing", "f1": "auto racing",
+                 "indianapolis": "auto racing", "super_bowl": "football", "nfl": "football",
+                 "world_series": "baseball", "indian_premier_league": "cricket", "wimbledon": "tennis",
+                 "tour_de_france": "cycling", "kentucky_derby": "horse racing", "ufc": "boxing",
+                 "olympic": "olympics", "nba": "basketball", "euro_20": "soccer"}
+        generic = {"cricket", "football", "soccer", "boxing", "baseball", "rugby", "marathon", "wrestling",
+                   "horse_racing", "olympics"}
+        key = m.group(1).lower().strip("_")
+        sport = sport.get(key) or (key.replace("_", " ") if key in generic else "sports")
+        topic.queries["internet_archive"] = f"{sport} newsreel"
+        topic.angle = f"How {sport} looked in old newsreels"
     else:   # no model: the article title is the query
         base = re.sub(r"\(.*?\)", "", topic.title).strip()
         topic.queries["internet_archive"] = base
@@ -169,13 +204,15 @@ def relevant(item, query: str) -> bool:
     return not words or any(w in hay for w in words)
 
 
-def todays_topics(cfg, llm, cache_dir, cutoff: int, max_topics: int = 8) -> list[Topic]:
-    cache = cache_dir / f"trends_{date.today():%Y-%m-%d}.json"
+def todays_topics(cfg, llm, cache_dir, cutoff: int, max_topics: int = 8,
+                  allow_sports: bool = False, sports_only: bool = False) -> list[Topic]:
+    mode = "sports" if sports_only else ("all" if allow_sports else "general")
+    cache = cache_dir / f"trends_{date.today():%Y-%m-%d}_{mode}.json"
     if cache.exists():
         return [Topic(**t) for t in json.loads(cache.read_text())]
     planned = []
     try:
-        cands = candidates(cfg)
+        cands = candidates(cfg, allow_sports=allow_sports, sports_only=sports_only)
     except Exception as e:  # noqa: BLE001
         log.warning("trend feeds unavailable: %s", e)
         return []
