@@ -50,6 +50,29 @@ Reality check from the same audit: archive long-form earns roughly $2-3 per 1,00
 about $0.17-0.33 even in the US/UK, and a solo archival channel can sit near zero for months. One video
 making nearly all of a channel's views has also triggered YPP reviews. Plan for slow growth and steady variety.
 
+## Cricket & football stat Shorts
+
+`cricket-football-stats` makes animated charts from match data: no footage, photos or logos, so
+none of the copyright problems that end sports-clip channels. Statistics are facts, and facts aren't copyrighted.
+
+| Format | Example |
+|---|---|
+| Bar race | "Most IPL runs of all time": bars overtake each other season by season |
+| Ranking countdown | "Fastest fifties in IPL history" or "The biggest wins in the Premier League since 2010", #10 to #1 |
+| Duel | "Manchester City vs Liverpool: points since 2010" with racing lines and live counters |
+
+* **Data:** cricket from Cricsheet ball-by-ball files (IPL, T20Is, ODIs, Tests); football from openfootball
+  (Premier League, La Liga, Serie A, Bundesliga; dedicated to the public domain). Every description credits
+  the source. Check the current licence at cricsheet.org before monetizing.
+* **Trends:** when the IPL, Ashes, a World Cup or a league is trending on Wikipedia, its stories go first.
+  An IPL trend never pulls Premier League stories.
+* **Honest numbers:** every number and name in the title, hook and description must appear in the
+  computed facts, or the copy is rejected.
+* **Sound:** short synthesized ticks on each change and a low hit on the final reveal. No music, no voice.
+* **Speed:** about 6-12 seconds to render a 20-30 second Short. Long-form is switched off for this channel.
+* **Freshness:** a story's id includes the latest season and match count, so new matches produce new videos.
+  Cricket zips are re-downloaded at most once every 20 hours.
+
 ## Sports & action channel
 
 `sports-action-history` posts real sport and stunts from **1895-1967**, never modern matches.
@@ -189,6 +212,7 @@ run.py                     CLI
 autoreel/agent.py          the agent loop (trends → discover → judge → write → compose → queue)
 autoreel/trends.py         trend radar (Wikipedia most-read, On this day) + topic planning
 autoreel/longform.py       weekly 16:9 compilation with chapters
+autoreel/stats/            stat Shorts: football + cricket data, chart renderer, story maker
 autoreel/sources/          internet_archive, nasa, local + licence policy
 autoreel/finder.py         visual moment finder
 autoreel/copywriter.py     caption drafting + lint
@@ -196,5 +220,5 @@ autoreel/compose/          ffmpeg composer, 6 ASS layouts, HyperFrames overlay
 autoreel/review.py         review page + Telegram approvals
 autoreel/publisher.py      scheduling + YouTube upload
 templates/hyperframes/     HTML overlay template (+ vendored GSAP)
-tests/                     40 tests, including full agent cycles and long-form builds
+tests/                     45 tests, including full agent cycles and long-form builds
 ```

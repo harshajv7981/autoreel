@@ -192,6 +192,10 @@ class Agent:
             if spec["type"] == "trends":
                 made += self._fill_from_trends(ch, spec, need - made)
                 continue
+            if spec["type"] == "stats":
+                from .stats import maker
+                made += maker.make(self, ch, spec, need - made)
+                continue
             for item in self._spec_items(spec):
                 if made >= need:
                     break

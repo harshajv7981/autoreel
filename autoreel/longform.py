@@ -166,6 +166,8 @@ dashes, no hashtags, no invented facts. Return JSON:
 
 def build_weekly(cfg, db, llm, ch, force: bool = False) -> int | None:
     lf = cfg.longform
+    if not ch.get("longform", True):
+        return None
     last = db.last_long(ch.name)
     if last and not force:
         age = datetime.now(timezone.utc) - datetime.fromisoformat(last["created"])

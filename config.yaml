@@ -150,6 +150,27 @@ channels:
         query: '(subject:(boxing OR baseball OR football OR soccer OR cricket OR "auto racing" OR olympics OR rodeo OR "air race" OR stunt OR "Harold Lloyd" OR "Buster Keaton" OR "Douglas Fairbanks")) AND year:[1895 TO {pd_cutoff}]'
     tags: [sports history, vintage sports, boxing, football history, old newsreel, stunts]
 
+  - name: cricket-football-stats   # animated stat Shorts from match data: no footage, photos or logos
+    enabled: true
+    token: ./secrets/token_cricket-football-stats.json
+    playlist_id: null
+    longform: false
+    voice: >-
+      A sharp, slightly cheeky stats nerd. Leads with the most surprising number. Short, punchy, plain words.
+    clip_seconds: [15, 45]
+    buffer: 4
+    sources:
+      - type: stats            # Cricsheet ball-by-ball data (credit Cricsheet in every description)
+        sport: cricket
+        competitions: [ipl, t20is, odis, tests]
+        gender: male
+        min_balls_economy: 600 # 100 overs minimum for economy rankings
+      - type: stats            # openfootball results (public domain)
+        sport: football
+        leagues: [en.1, es.1, it.1, de.1]
+        first_season: 2010
+    tags: [cricket stats, ipl, football stats, premier league, sports data]
+
   - name: classic-comedy
     enabled: false
     token: ./secrets/token_classic-comedy.json

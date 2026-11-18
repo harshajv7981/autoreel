@@ -121,6 +121,9 @@ class Policy:
                 return False, f"third-party footage ({creator}) - not a NASA work"
             return True, "US Government work (NASA media guidelines)"
 
+        if item.source == "stats":
+            return True, "statistics computed from open data (facts are not copyrighted)"
+
         if item.source == "local":
             if not item.licence:
                 return False, "no licence.json next to the file"
